@@ -10,15 +10,10 @@ import {
   Calendar, Users, TrendingUp, Clock, Building2
 } from 'lucide-react';
 
-// Las columnas del Kanban representan ESTADOS (igual que en la pantalla de
-// El Kanban se organiza por status (no por pipeline_stage). Los colores y labels
-// vienen de STATUS_LIST (importado de crmConstants — fuente de verdad única).
-// STATUS_TO_DEFAULT_STAGE es el mapeo inverso: al mover una tarjeta a una columna
-// de ESTADO, qué pipeline_stage le asignamos por defecto.
 const STATUS_TO_DEFAULT_STAGE = {
   pendiente_contacto: 'lead',
   en_desarrollo:       'first_contact',
-  en_evaluacion:        'first_contact', // sin fase dedicada propia; se asimila a "en desarrollo"
+  en_evaluacion:        'first_contact',
   en_proceso_alta:     'onboarding',
   activo:              'active',
   rechazado:           'closed_no_deal',
@@ -55,8 +50,6 @@ function formatShortDate(dateStr) {
 }
 
 // ============ GET CHANNEL LAST ACTIVITY ============
-// Calcula la fecha de la última actividad en un canal consultando todas las tablas de actividad.
-// Usado para filtrar el pipeline por período (no solo por cambio de fase).
 async function getChannelLastActivity(channelId) {
   try {
     const results = await Promise.allSettled([
@@ -128,7 +121,6 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
         </div>
       )}
 
-      {/* Potencial CAES / Energía si existen */}
       {(channel.potencial_caes || channel.potencial_energia) && (
         <div className="flex gap-1 mb-1">
           {channel.potencial_caes && (
@@ -362,7 +354,6 @@ export default function PipelinePage() {
   const scrollRef = useRef(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
-  // Filters
   const [period, setPeriod] = useState('all');
   const [dateType, setDateType] = useState('creation');
   const [selectedKam, setSelectedKam] = useState('all');
@@ -381,7 +372,6 @@ export default function PipelinePage() {
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
 
-  // Enrich channels with last_activity_at when dateType changes to activity
   useEffect(() => {
     if (dateType !== 'creation' && period !== 'all' && !loadingActivities) {
       enrichChannelsWithActivity();
@@ -440,8 +430,6 @@ export default function PipelinePage() {
 
       setChannels(enriched);
 
-      // Clasificaciones de todos los canales visibles, en UNA sola query
-      // (mismo patrón que en ChannelsPage, para no disparar N queries)
       const ids = enriched.map(ch => ch.id);
       if (ids.length > 0) {
         const { data: cls } = await supabase
@@ -472,7 +460,6 @@ export default function PipelinePage() {
     const channel = channels.find(c => c.id === channelId);
     if (!channel || channel.status === newStatusKey) return;
 
-    // Si el destino es rechazado o cierre sin acuerdo y no hay motivo, pedir motivo
     if ((newStatusKey === 'rechazado' || newStatusKey === 'cierre_sin_acuerdo') && !rejectionReason) {
       setPendingReject({ channelId, statusKey: newStatusKey });
       return;
@@ -494,7 +481,6 @@ export default function PipelinePage() {
     try {
       const updateData = { pipeline_stage: newPipelineStage, status: newStatusKey, pipeline_stage_changed_at: now };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      // Si se mueve FUERA de rechazo, limpiar el motivo
       if (newStatusKey !== 'rechazado' && newStatusKey !== 'cierre_sin_acuerdo') updateData.rejection_reason = null;
 
       const { error } = await supabase.from('channels').update(updateData).eq('id', channelId);
@@ -514,7 +500,6 @@ export default function PipelinePage() {
 
   function handleChannelClick(channelId) { navigate(`/channels?detail=${channelId}`); }
 
-  // ---- FILTERING ----
   const filteredChannels = channels.filter(ch => {
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;
     if (period === 'all') return true;
@@ -527,8 +512,6 @@ export default function PipelinePage() {
       range = getDateRange(period);
     }
 
-    // Si dateType es 'creation', filtrar por created_at
-    // Si dateType es 'activity', filtrar por last_activity_at (que incluye calls, meetings, notes, etc.)
     const dateField = dateType === 'creation' 
       ? ch.created_at 
       : (ch.last_activity_at || ch.pipeline_stage_changed_at || ch.updated_at);
@@ -538,7 +521,6 @@ export default function PipelinePage() {
     return d >= range.start && d <= range.end;
   });
 
-  // Group by status (igual que en la pantalla de Canales)
   const channelsByStage = {};
   STATUS_LIST.forEach(s => { channelsByStage[s.key] = []; });
   filteredChannels.forEach(ch => {
@@ -546,20 +528,12 @@ export default function PipelinePage() {
     if (channelsByStage[key]) channelsByStage[key].push(ch);
   });
 
-  // KPIs — excluir pendiente_contacto y los estados terminales
   const inProcess = ['en_desarrollo', 'en_evaluacion', 'en_proceso_alta'];
   const totalInPipeline = filteredChannels.filter(c => inProcess.includes(c.status)).length;
   const newLeads     = filteredChannels.filter(c => c.status === 'pendiente_contacto').length;
   const advanced     = filteredChannels.filter(c => inProcess.includes(c.status)).length;
   const closed       = filteredChannels.filter(c => c.status === 'activo').length;
   const closedNoDeal = filteredChannels.filter(c => ['rechazado', 'cierre_sin_acuerdo'].includes(c.status)).length;
-  const avgDays = (() => {
-    const withDays = filteredChannels
-      .filter(c => !['activo', 'rechazado', 'cierre_sin_acuerdo'].includes(c.status) && c.pipeline_stage_changed_at)
-      .map(c => daysSince(c.pipeline_stage_changed_at))
-      .filter(d => d !== null);
-    return withDays.length > 0 ? Math.round(withDays.reduce((a, b) => a + b, 0) / withDays.length) : 0;
-  })();
 
   const teamBreakdown = isManager && selectedKam === 'all' ? teamKams.map(kam => {
     const kamChannels = filteredChannels.filter(c => c.assigned_to === kam.id);
@@ -583,7 +557,6 @@ export default function PipelinePage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Pipeline</h1>
@@ -599,12 +572,10 @@ export default function PipelinePage() {
         )}
       </div>
 
-      {/* KAM Selector */}
       {isManager && teamKams.length > 0 && (
         <KamSelector kams={teamKams} selected={selectedKam} onChange={setSelectedKam} />
       )}
 
-      {/* Period pills */}
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide mb-3">
         {[
           { key: 'all', label: 'Todos' },
@@ -623,7 +594,6 @@ export default function PipelinePage() {
         ))}
       </div>
 
-      {/* Date range + type */}
       {period !== 'all' && (
         <div className="bg-[#f7f8fa] border border-[#dde1e8] rounded-xl p-2.5 mb-3">
           <div className="flex items-center gap-2">
@@ -659,7 +629,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Loading indicator for activities */}
       {loadingActivities && dateType !== 'creation' && (
         <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
           <Loader2 size={14} className="animate-spin text-blue-600" />
@@ -667,7 +636,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* KPIs */}
       {period !== 'all' && (
         <div className="flex gap-2 mb-3">
           {[
@@ -684,7 +652,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Team breakdown */}
       {isManager && selectedKam === 'all' && period !== 'all' && teamBreakdown.length > 0 && (
         <div className="bg-[#f7f8fa] border border-[#dde1e8] rounded-xl p-2.5 mb-3">
           <div className="text-[9px] font-bold text-[#8b90a0] uppercase tracking-wider mb-2">Desglose por KAM</div>
@@ -710,7 +677,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Volume summary */}
       {(() => {
         const volTotals = {};
         filteredChannels.forEach(ch => {
@@ -739,10 +705,6 @@ export default function PipelinePage() {
         ) : null;
       })()}
 
-      {/* Barra de color por estado: cada segmento ocupa el mismo ancho fijo
-          (100/7 %), igual que cada columna de título de abajo, para que
-          coincidan exactamente en horizontal. NO es proporcional al número
-          de canales — es solo un indicador visual de color por estado. */}
       <div className="flex mb-3 h-2 rounded-full overflow-hidden bg-[#dde1e8]">
         {STATUS_LIST.map(stage => {
           const count = channelsByStage[stage.key]?.length || 0;
@@ -753,7 +715,6 @@ export default function PipelinePage() {
         })}
       </div>
 
-      {/* Kanban / Mobile */}
       {loading || loadingActivities ? (
         <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[#E87A1E]" /></div>
       ) : isMobile ? (
@@ -771,13 +732,11 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 px-4 py-3 rounded-xl text-center text-sm font-bold shadow-xl z-50"
           style={{ backgroundColor: toast.color || '#6366f1', color: '#fff' }}>{toast.message}</div>
       )}
 
-      {/* Modal motivo de descarte */}
       {pendingReject && (
         <RejectReasonModal
           channelName={channels.find(c => c.id === pendingReject.channelId)?.name || ''}
@@ -790,7 +749,6 @@ export default function PipelinePage() {
   );
 }
 
-// ============ MODAL MOTIVO DE DESCARTE ============
 function RejectReasonModal({ channelName, statusLabel, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
   return (

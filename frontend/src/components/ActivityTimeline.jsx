@@ -4,7 +4,7 @@ import { useAuthContext } from './AuthProvider';
 import {
   Phone, Mail, MessageCircle, Linkedin, Users, Calendar,
   Loader2, Save, ChevronDown, Plus, X, Check,
-  ArrowUpRight, ArrowDownLeft, Clock, Trash2, MapPin, StickyNote
+  ArrowUpRight, ArrowDownLeft, Clock, Trash2, MapPin, StickyNote, FileText, Download
 } from 'lucide-react';
 
 const TYPE_CONFIG = {
@@ -72,6 +72,13 @@ function formatPlannedDate(dateStr) {
   return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+
 export default function ActivityTimeline({ channel }) {
   const { user } = useAuthContext();
   const [activities, setActivities] = useState([]);
@@ -98,15 +105,17 @@ export default function ActivityTimeline({ channel }) {
   async function loadAll() {
     setLoading(true);
     try {
-      const [visitsRes, interRes, notesRes] = await Promise.allSettled([
+      const [visitsRes, interRes, notesRes, meetingsRes] = await Promise.allSettled([
         supabase.from('visits').select('*').eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(50),
         supabase.from('channel_interactions').select('*, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('channel_notes').select('*, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('channel_meetings').select('*, profiles(full_name)').eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(50),
       ]);
 
       const visits = (visitsRes.status === 'fulfilled' ? visitsRes.value.data : []) || [];
       const interactions = (interRes.status === 'fulfilled' ? interRes.value.data : []) || [];
       const notes = (notesRes.status === 'fulfilled' ? notesRes.value.data : []) || [];
+      const meetings = (meetingsRes.status === 'fulfilled' ? meetingsRes.value.data : []) || [];
 
       // Separate planned vs completed interactions
       const completedInter = interactions.filter(i => i.is_completed !== false && !i.planned_date);
@@ -132,6 +141,12 @@ export default function ActivityTimeline({ channel }) {
         ...notes.map(n => ({
           _type: 'note', _date: n.created_at, _id: `n-${n.id}`, _sourceId: n.id, _source: 'note',
           notes: n.content, authorName: n.profiles?.full_name, userId: n.user_id,
+        })),
+        ...meetings.map(m => ({
+          _type: 'meeting', _date: m.created_at, _id: `m-${m.id}`, _sourceId: m.id, _source: 'meeting',
+          meetingDate: m.meeting_date, attendees: m.attendees, notes: m.notes,
+          fileName: m.file_name, fileSize: m.file_size, fileUrl: m.file_url,
+          authorName: m.profiles?.full_name, userId: m.uploaded_by,
         })),
       ].sort((a, b) => new Date(b._date) - new Date(a._date));
 
@@ -193,6 +208,7 @@ export default function ActivityTimeline({ channel }) {
     try {
       if (activity._source === 'interaction') await supabase.from('channel_interactions').delete().eq('id', activity._sourceId);
       else if (activity._source === 'note') await supabase.from('channel_notes').delete().eq('id', activity._sourceId);
+      else if (activity._source === 'meeting') await supabase.from('channel_meetings').delete().eq('id', activity._sourceId);
       setActivities(prev => prev.filter(a => a._id !== activity._id));
     } catch (err) { console.error(err); }
   }
@@ -205,7 +221,7 @@ export default function ActivityTimeline({ channel }) {
   const filters = [
     { key: 'all', label: 'Todo' }, { key: 'visit', label: '📍 Visitas' },
     { key: 'call', label: '📞 Llamadas' }, { key: 'email', label: '📧 Emails' },
-    { key: 'whatsapp', label: '💬 WhatsApp' }, { key: 'note', label: '📝 Notas' },
+    { key: 'whatsapp', label: '💬 WhatsApp' }, { key: 'meeting', label: '👥 Reuniones' }, { key: 'note', label: '📝 Notas' },
   ];
   const filtered = filter === 'all' ? activities : activities.filter(a => a._type === filter);
   const phoneNumber = channel?.phone?.replace(/\s/g, '');
@@ -310,9 +326,6 @@ export default function ActivityTimeline({ channel }) {
               return (
                 <button key={t.key} onClick={() => setNewForm(p => ({ ...p, interaction_type: t.key }))}
                   className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{ background: sel ? cfg.bg.replace('bg-', '').includes('[') ? cfg.bg.replace('bg-[', '').replace(']','') : undefined : '#f7f8fa',
-                    border: `1px solid ${sel ? cfg.color : '#dde1e8'}`, color: sel ? cfg.color : '#8b90a0' }}
-                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${sel ? '' : ''}`}
                   style={{ background: sel ? (cfg.color + '15') : '#f7f8fa', border: `1px solid ${sel ? cfg.color : '#dde1e8'}`, color: sel ? cfg.color : '#8b90a0' }}>
                   {t.icon} {t.label}
                 </button>
@@ -431,6 +444,7 @@ export default function ActivityTimeline({ channel }) {
               const Icon = cfg.icon;
               const resultCfg = activity.result ? RESULT_CONFIG[activity.result] : null;
               const isVisit = activity._type === 'visit';
+              const isMeeting = activity._type === 'meeting';
               const canDelete = activity._source && activity.userId === user?.id;
               return (
                 <div key={activity._id} className="flex gap-3 group">
@@ -447,14 +461,29 @@ export default function ActivityTimeline({ channel }) {
                       {activity.direction === 'inbound' && <span className="flex items-center gap-0.5 text-[9px] text-green-500"><ArrowDownLeft size={9} /> Entrante</span>}
                       {resultCfg && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${resultCfg.bg} ${resultCfg.color}`}>{resultCfg.label}</span>}
                       {activity.duration > 0 && <span className="text-[9px] text-text-muted">{activity.duration} min</span>}
+                      {isMeeting && activity.meetingDate && <span className="text-[9px] text-text-muted">📅 {new Date(activity.meetingDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>}
                       <span className="text-[9px] text-text-muted ml-auto">{formatDate(activity._date)} · {formatTime(activity._date)}</span>
-                      {canDelete && <button onClick={() => deleteActivity(activity)} className="p-0.5 text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={10} /></button>}
+                      {canDelete && <button onClick={() => deleteActivity(activity)} className="p-0.5 text-text-muted hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>}
                     </div>
                     {isVisit && activity.objective && <div className="text-[10px] text-text-muted mb-0.5">Objetivo: {activity.objective.replace(/_/g, ' ')}</div>}
                     {activity.subject && <div className="text-xs font-semibold text-text-primary mb-0.5">{activity.subject}</div>}
+                    {isMeeting && activity.attendees && <div className="text-[10px] text-text-muted mb-0.5">👥 Asistentes: {activity.attendees}</div>}
                     {activity.contact && <div className="text-[10px] text-text-muted mb-0.5">👤 {activity.contact}</div>}
-                    {activity.authorName && activity._type === 'note' && <div className="text-[10px] text-text-muted mb-0.5">por {activity.authorName}</div>}
+                    {activity.authorName && (activity._type === 'note' || isMeeting) && <div className="text-[10px] text-text-muted mb-0.5">por {activity.authorName}</div>}
                     {activity.notes && <div className={`text-xs text-text-secondary leading-relaxed whitespace-pre-wrap ${isVisit ? 'bg-surface-1 rounded-lg p-2 mt-1' : ''}`}>{activity.notes}</div>}
+                    {isMeeting && activity.fileUrl && (
+                      <div className="mt-2 p-2 bg-surface-1 border border-surface-3 rounded-lg flex items-center gap-2">
+                        <FileText size={14} className="text-text-muted flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[10px] font-semibold text-text-primary truncate">{activity.fileName}</div>
+                          <div className="text-[9px] text-text-muted">{formatFileSize(activity.fileSize)}</div>
+                        </div>
+                        <a href={activity.fileUrl} target="_blank" rel="noopener noreferrer"
+                          className="p-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-500 rounded-lg transition-colors flex-shrink-0">
+                          <Download size={12} />
+                        </a>
+                      </div>
+                    )}
                     {activity.nextSteps && (
                       <div className="mt-1.5 px-2 py-1.5 bg-brand-50 border border-brand-200 rounded-lg">
                         <div className="text-[9px] font-bold text-brand-500 uppercase tracking-wider">Próximos pasos</div>

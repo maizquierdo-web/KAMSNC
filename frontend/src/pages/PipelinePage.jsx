@@ -10,15 +10,10 @@ import {
   Calendar, Users, TrendingUp, Clock, Building2
 } from 'lucide-react';
 
-// Las columnas del Kanban representan ESTADOS (igual que en la pantalla de
-// El Kanban se organiza por status (no por pipeline_stage). Los colores y labels
-// vienen de STATUS_LIST (importado de crmConstants — fuente de verdad única).
-// STATUS_TO_DEFAULT_STAGE es el mapeo inverso: al mover una tarjeta a una columna
-// de ESTADO, qué pipeline_stage le asignamos por defecto.
 const STATUS_TO_DEFAULT_STAGE = {
   pendiente_contacto: 'lead',
   en_desarrollo:       'first_contact',
-  en_evaluacion:        'first_contact', // sin fase dedicada propia; se asimila a "en desarrollo"
+  en_evaluacion:        'first_contact',
   en_proceso_alta:     'onboarding',
   activo:              'active',
   rechazado:           'closed_no_deal',
@@ -54,6 +49,37 @@ function formatShortDate(dateStr) {
   return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
+// ============ GET CHANNEL LAST ACTIVITY ============
+async function getChannelLastActivity(channelId) {
+  try {
+    const results = await Promise.allSettled([
+      supabase.from('visits').select('checkin_at').eq('channel_id', channelId).order('checkin_at', { ascending: false }).limit(1),
+      supabase.from('channel_interactions').select('created_at').eq('channel_id', channelId).order('created_at', { ascending: false }).limit(1),
+      supabase.from('channel_meetings').select('created_at').eq('channel_id', channelId).order('created_at', { ascending: false }).limit(1),
+      supabase.from('channel_notes').select('created_at').eq('channel_id', channelId).order('created_at', { ascending: false }).limit(1),
+    ]);
+
+    const dates = [];
+    if (results[0].status === 'fulfilled' && results[0].value.data?.length > 0) {
+      dates.push(new Date(results[0].value.data[0].checkin_at));
+    }
+    if (results[1].status === 'fulfilled' && results[1].value.data?.length > 0) {
+      dates.push(new Date(results[1].value.data[0].created_at));
+    }
+    if (results[2].status === 'fulfilled' && results[2].value.data?.length > 0) {
+      dates.push(new Date(results[2].value.data[0].created_at));
+    }
+    if (results[3].status === 'fulfilled' && results[3].value.data?.length > 0) {
+      dates.push(new Date(results[3].value.data[0].created_at));
+    }
+
+    return dates.length > 0 ? new Date(Math.max(...dates.map(d => d.getTime()))).toISOString() : null;
+  } catch (err) {
+    console.error('Error getting channel last activity:', err);
+    return null;
+  }
+}
+
 // ============ CHANNEL CARD ============
 function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, dateType, classifications }) {
   const daysInStage = daysSince(channel.pipeline_stage_changed_at || channel.updated_at);
@@ -83,7 +109,7 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
       <div className="text-[9px] text-[#8b90a0] mb-1">
         {dateType === 'creation'
           ? `Creado: ${formatShortDate(channel.created_at)}`
-          : `→ ${formatShortDate(channel.pipeline_stage_changed_at || channel.updated_at)}`}
+          : `Actividad: ${formatShortDate(channel.last_activity_at || channel.pipeline_stage_changed_at || channel.updated_at)}`}
       </div>
 
       {channel.volume_amount != null && channel.volume_unit && (
@@ -95,7 +121,6 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
         </div>
       )}
 
-      {/* Potencial CAES / Energía si existen */}
       {(channel.potencial_caes || channel.potencial_energia) && (
         <div className="flex gap-1 mb-1">
           {channel.potencial_caes && (
@@ -220,7 +245,7 @@ function PipelineMobile({ channelsByStage, onMove, loading, onChannelClick, type
                       <div className="text-sm font-semibold truncate hover:text-[#E87A1E] transition-colors">{ch.name}</div>
                       <div className="text-[10px] text-[#8b90a0]">
                         {showKam && ch.profiles?.full_name ? `${ch.profiles.full_name} · ` : ''}
-                        {dateType === 'creation' ? `Creado: ${formatShortDate(ch.created_at)}` : `→ ${formatShortDate(ch.pipeline_stage_changed_at || ch.updated_at)}`}
+                        {dateType === 'creation' ? `Creado: ${formatShortDate(ch.created_at)}` : `Actividad: ${formatShortDate(ch.last_activity_at || ch.pipeline_stage_changed_at || ch.updated_at)}`}
                       </div>
                       {ch.volume_amount != null && ch.volume_unit && (
                         <span className="inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded"
@@ -328,8 +353,8 @@ export default function PipelinePage() {
   const [toast, setToast] = useState(null);
   const [pendingReject, setPendingReject] = useState(null);
   const scrollRef = useRef(null);
+  const [loadingActivities, setLoadingActivities] = useState(false);
 
-  // Filters
   const [period, setPeriod] = useState('all');
   const [dateType, setDateType] = useState('creation');
   const [selectedKam, setSelectedKam] = useState('all');
@@ -413,6 +438,29 @@ export default function PipelinePage() {
 }, [user, period, dateType, customFrom, customTo, selectedKam, isManager]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
 
+  useEffect(() => {
+    if (dateType !== 'creation' && period !== 'all' && !loadingActivities) {
+      enrichChannelsWithActivity();
+    }
+  }, [dateType, period]);
+
+  async function enrichChannelsWithActivity() {
+    setLoadingActivities(true);
+    try {
+      const enriched = await Promise.all(
+        channels.map(async (ch) => {
+          const lastActivity = await getChannelLastActivity(ch.id);
+          return { ...ch, last_activity_at: lastActivity };
+        })
+      );
+      setChannels(enriched);
+    } catch (err) {
+      console.error('Error enriching channels with activity:', err);
+    } finally {
+      setLoadingActivities(false);
+    }
+  }
+
   async function loadTeamKams() {
     try {
       const { data } = await supabase
@@ -448,8 +496,6 @@ export default function PipelinePage() {
 
       setChannels(enriched);
 
-      // Clasificaciones de todos los canales visibles, en UNA sola query
-      // (mismo patrón que en ChannelsPage, para no disparar N queries)
       const ids = enriched.map(ch => ch.id);
       if (ids.length > 0) {
         const { data: cls } = await supabase
@@ -487,7 +533,6 @@ export default function PipelinePage() {
     const channel = channels.find(c => c.id === channelId);
     if (!channel || channel.status === newStatusKey) return;
 
-    // Si el destino es rechazado o cierre sin acuerdo y no hay motivo, pedir motivo
     if ((newStatusKey === 'rechazado' || newStatusKey === 'cierre_sin_acuerdo') && !rejectionReason) {
       setPendingReject({ channelId, statusKey: newStatusKey });
       return;
@@ -509,7 +554,6 @@ export default function PipelinePage() {
     try {
       const updateData = { pipeline_stage: newPipelineStage, status: newStatusKey, pipeline_stage_changed_at: now };
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
-      // Si se mueve FUERA de rechazo, limpiar el motivo
       if (newStatusKey !== 'rechazado' && newStatusKey !== 'cierre_sin_acuerdo') updateData.rejection_reason = null;
 
       const { error } = await supabase.from('channels').update(updateData).eq('id', channelId);
@@ -529,7 +573,6 @@ export default function PipelinePage() {
 
   function handleChannelClick(channelId) { navigate(`/channels?detail=${channelId}`); }
 
-  // ---- FILTERING ----
   const filteredChannels = channels.filter(ch => {
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;
     if (period === 'all') return true;
@@ -545,13 +588,15 @@ export default function PipelinePage() {
       range = getDateRange(period);
     }
 
-    const dateField = ch.created_at;
+    const dateField = dateType === 'creation' 
+      ? ch.created_at 
+      : (ch.last_activity_at || ch.pipeline_stage_changed_at || ch.updated_at);
+    
     if (!dateField) return false;
     const d = new Date(dateField);
     return d >= range.start && d <= range.end;
   });
 
-  // Group by status (igual que en la pantalla de Canales)
   const channelsByStage = {};
   STATUS_LIST.forEach(s => { channelsByStage[s.key] = []; });
   filteredChannels.forEach(ch => {
@@ -559,20 +604,12 @@ export default function PipelinePage() {
     if (channelsByStage[key]) channelsByStage[key].push(ch);
   });
 
-  // KPIs — excluir pendiente_contacto y los estados terminales
   const inProcess = ['en_desarrollo', 'en_evaluacion', 'en_proceso_alta'];
   const totalInPipeline = filteredChannels.filter(c => inProcess.includes(c.status)).length;
   const newLeads     = filteredChannels.filter(c => c.status === 'pendiente_contacto').length;
   const advanced     = filteredChannels.filter(c => inProcess.includes(c.status)).length;
   const closed       = filteredChannels.filter(c => c.status === 'activo').length;
   const closedNoDeal = filteredChannels.filter(c => ['rechazado', 'cierre_sin_acuerdo'].includes(c.status)).length;
-  const avgDays = (() => {
-    const withDays = filteredChannels
-      .filter(c => !['activo', 'rechazado', 'cierre_sin_acuerdo'].includes(c.status) && c.pipeline_stage_changed_at)
-      .map(c => daysSince(c.pipeline_stage_changed_at))
-      .filter(d => d !== null);
-    return withDays.length > 0 ? Math.round(withDays.reduce((a, b) => a + b, 0) / withDays.length) : 0;
-  })();
 
   const teamBreakdown = isManager && selectedKam === 'all' ? teamKams.map(kam => {
     const kamChannels = filteredChannels.filter(c => c.assigned_to === kam.id);
@@ -596,7 +633,6 @@ export default function PipelinePage() {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-xl font-extrabold tracking-tight">Pipeline</h1>
@@ -612,12 +648,10 @@ export default function PipelinePage() {
         )}
       </div>
 
-      {/* KAM Selector */}
       {isManager && teamKams.length > 0 && (
         <KamSelector kams={teamKams} selected={selectedKam} onChange={setSelectedKam} />
       )}
 
-      {/* Period pills */}
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide mb-3">
         {[
           { key: 'all', label: 'Todos' },
@@ -636,7 +670,6 @@ export default function PipelinePage() {
         ))}
       </div>
 
-      {/* Date range + type */}
       {period !== 'all' && (
         <div className="bg-[#f7f8fa] border border-[#dde1e8] rounded-xl p-2.5 mb-3">
           <div className="flex items-center gap-2">
@@ -672,7 +705,13 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* KPIs */}
+      {loadingActivities && dateType !== 'creation' && (
+        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin text-blue-600" />
+          <span className="text-xs text-blue-600 font-semibold">Cargando actividad...</span>
+        </div>
+      )}
+
       {period !== 'all' && (
         <div className="flex gap-2 mb-3">
           {[
@@ -689,7 +728,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Team breakdown */}
       {isManager && selectedKam === 'all' && period !== 'all' && teamBreakdown.length > 0 && (
         <div className="bg-[#f7f8fa] border border-[#dde1e8] rounded-xl p-2.5 mb-3">
           <div className="text-[9px] font-bold text-[#8b90a0] uppercase tracking-wider mb-2">Desglose por KAM</div>
@@ -715,7 +753,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Volume summary */}
       {(() => {
         const volTotals = {};
         filteredChannels.forEach(ch => {
@@ -744,10 +781,6 @@ export default function PipelinePage() {
         ) : null;
       })()}
 
-      {/* Barra de color por estado: cada segmento ocupa el mismo ancho fijo
-          (100/7 %), igual que cada columna de título de abajo, para que
-          coincidan exactamente en horizontal. NO es proporcional al número
-          de canales — es solo un indicador visual de color por estado. */}
       <div className="flex mb-3 h-2 rounded-full overflow-hidden bg-[#dde1e8]">
         {STATUS_LIST.map(stage => {
           const count = channelsByStage[stage.key]?.length || 0;
@@ -758,8 +791,7 @@ export default function PipelinePage() {
         })}
       </div>
 
-      {/* Kanban / Mobile */}
-      {loading ? (
+      {loading || loadingActivities ? (
         <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin text-[#E87A1E]" /></div>
       ) : isMobile ? (
         <PipelineMobile channelsByStage={channelsByStage} onMove={moveChannel} loading={loading}
@@ -776,13 +808,11 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-24 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 px-4 py-3 rounded-xl text-center text-sm font-bold shadow-xl z-50"
           style={{ backgroundColor: toast.color || '#6366f1', color: '#fff' }}>{toast.message}</div>
       )}
 
-      {/* Modal motivo de descarte */}
       {pendingReject && (
         <RejectReasonModal
           channelName={channels.find(c => c.id === pendingReject.channelId)?.name || ''}
@@ -795,7 +825,6 @@ export default function PipelinePage() {
   );
 }
 
-// ============ MODAL MOTIVO DE DESCARTE ============
 function RejectReasonModal({ channelName, statusLabel, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
   return (

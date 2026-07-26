@@ -348,6 +348,11 @@ export default function CalendarPage() {
       setPlannedVisits(plannedRes.data || []);
       setPlannedActions(actionsRes.data || []);
       setCompletedVisits(visitsRes.data || []);
+      const ids = new Set();
+(plannedRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
+(actionsRes.data || []).forEach(a => { if (a?.channel_id) ids.add(a.channel_id); });
+(visitsRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
+setActivityChannelIds(ids);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }

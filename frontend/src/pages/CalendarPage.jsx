@@ -20,6 +20,29 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function isSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 function formatDateKey(date) { const p = (n) => String(n).padStart(2, '0'); return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}`; }
 
+function getDateRange(period) {
+  const now = new Date();
+  const end = new Date(now);
+  const start = new Date(now);
+
+  if (period === '7d') start.setDate(start.getDate() - 6);
+  else if (period === '14d') start.setDate(start.getDate() - 13);
+  else if (period === '30d') start.setDate(start.getDate() - 29);
+  else if (period === '90d') start.setDate(start.getDate() - 89);
+  else return null;
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function getPeriodRange(periodKey, customFrom, customTo) {
+  if (periodKey === 'custom') {
+    if (!customFrom || !customTo) return null;
+    return { start: new Date(customFrom), end: new Date(customTo + 'T23:59:59') };
+  }
+  return getDateRange(periodKey);
+}
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const TYPE_CONFIG = {
@@ -260,6 +283,8 @@ export default function CalendarPage() {
   const [plannedActions, setPlannedActions] = useState([]);
   const [completedVisits, setCompletedVisits] = useState([]);
   const [channels, setChannels] = useState([]);
+  const [activityChannelIds, setActivityChannelIds] = useState(new Set());
+  const [dateType, setDateType] = useState('creation');
   const [showNewModal, setShowNewModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [selectedKam, setSelectedKam] = useState('all');
@@ -299,7 +324,11 @@ export default function CalendarPage() {
       const [plannedRes, actionsRes, visitsRes] = await Promise.all([
         (() => {
           let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
-            .gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+           if (dateType === 'activity_change') {
+  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
+} else {
+  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+}
           if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
           else if (!isManager) q = q.eq('kam_id', user.id);
           return q;
@@ -307,7 +336,11 @@ export default function CalendarPage() {
         (() => {
           let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
             .not('planned_date', 'is', null)
-            .gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+           if (dateType === 'activity_change') {
+  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
+} else {
+  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+}
           if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
           else if (!isManager) q = q.eq('user_id', user.id);
           return q;
@@ -324,6 +357,11 @@ export default function CalendarPage() {
       setPlannedVisits(plannedRes.data || []);
       setPlannedActions(actionsRes.data || []);
       setCompletedVisits(visitsRes.data || []);
+      const ids = new Set();
+(plannedRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
+(actionsRes.data || []).forEach(a => { if (a?.channel_id) ids.add(a.channel_id); });
+(visitsRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
+setActivityChannelIds(ids);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
@@ -447,7 +485,12 @@ export default function CalendarPage() {
   const dayEvents = getDayEvents(selectedDay);
   const totalPlanned = plannedVisits.length + plannedActions.filter(a => !a.is_completed).length;
   const totalCompleted = completedVisits.length + plannedActions.filter(a => a.is_completed).length;
-
+const visibleChannels = channels.filter(ch => {
+  if (dateType === 'activity_change') {
+    return activityChannelIds.has(ch.id);
+  }
+  return true;
+});
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -455,6 +498,15 @@ export default function CalendarPage() {
           <h1 className="text-xl font-extrabold tracking-tight">Agenda</h1>
           <p className="text-xs text-text-secondary">{weekLabel}</p>
         </div>
+       <div className="flex items-center gap-2">
+        <select
+  value={dateType}
+  onChange={(e) => setDateType(e.target.value)}
+  className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-sm"
+>
+  <option value="creation">Creación</option>
+  <option value="activity_change">Cambios de actividad</option>
+</select>
         <button onClick={() => setShowNewModal(true)}
           className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors">
           <Plus size={14} /> Planificar

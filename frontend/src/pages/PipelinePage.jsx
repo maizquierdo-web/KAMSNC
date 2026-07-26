@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
@@ -345,6 +345,7 @@ export default function PipelinePage() {
   const navigate = useNavigate();
   const { typeMap } = useChannelTypes();
   const [channels, setChannels] = useState([]);
+  const [activityChannelIds, setActivityChannelIds] = useState(new Set());
   const [classificationsByChannel, setClassificationsByChannel] = useState({});
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(null);
@@ -370,6 +371,71 @@ export default function PipelinePage() {
   }, []);
 
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
+  useEffect(() => {
+  if (!user || period === 'all' || dateType !== 'activity_change') {
+    setActivityChannelIds(new Set());
+    return;
+  }
+
+  let cancelled = false;
+
+  async function loadActivityIds() {
+    const range = getPeriodRange(period);
+    if (!range) {
+      setActivityChannelIds(new Set());
+      return;
+    }
+
+    const startIso = range.start.toISOString();
+    const endIso = range.end.toISOString();
+    const startDate = range.start.toISOString().slice(0, 10);
+    const endDate = range.end.toISOString().slice(0, 10);
+
+    const kamFilter = selectedKam !== 'all' ? selectedKam : (!isManager ? user.id : null);
+
+    const [interactionsRes, plannedVisitsRes, visitsRes, pipelineHistoryRes] = await Promise.all([
+      (() => {
+        let q = supabase.from('channel_interactions')
+          .select('channel_id, user_id, planned_date, created_at')
+          .or(`and(planned_date.gte.${startDate},planned_date.lte.${endDate}),and(created_at.gte.${startIso},created_at.lte.${endIso})`);
+        if (kamFilter) q = q.eq('user_id', kamFilter);
+        return q;
+      })(),
+      (() => {
+        let q = supabase.from('planned_visits')
+          .select('channel_id, kam_id, planned_date')
+          .gte('planned_date', startDate).lte('planned_date', endDate);
+        if (kamFilter) q = q.eq('kam_id', kamFilter);
+        return q;
+      })(),
+      (() => {
+        let q = supabase.from('visits')
+          .select('channel_id, kam_id, checkin_at')
+          .gte('checkin_at', startIso).lte('checkin_at', endIso);
+        if (kamFilter) q = q.eq('kam_id', kamFilter);
+        return q;
+      })(),
+      (() => {
+        let q = supabase.from('channel_pipeline_history')
+          .select('channel_id, changed_by, created_at')
+          .gte('created_at', startIso).lte('created_at', endIso);
+        if (kamFilter) q = q.eq('changed_by', kamFilter);
+        return q;
+      })(),
+    ]);
+
+    const ids = new Set();
+    (interactionsRes.data || []).forEach(r => r.channel_id && ids.add(r.channel_id));
+    (plannedVisitsRes.data || []).forEach(r => r.channel_id && ids.add(r.channel_id));
+    (visitsRes.data || []).forEach(r => r.channel_id && ids.add(r.channel_id));
+    (pipelineHistoryRes.data || []).forEach(r => r.channel_id && ids.add(r.channel_id));
+
+    if (!cancelled) setActivityChannelIds(ids);
+  }
+
+  loadActivityIds().catch(console.error);
+  return () => { cancelled = true; };
+}, [user, period, dateType, customFrom, customTo, selectedKam, isManager]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
 
   useEffect(() => {
@@ -454,6 +520,13 @@ export default function PipelinePage() {
       setLoading(false);
     }
   }
+  function getPeriodRange(periodKey) {
+  if (periodKey === 'custom') {
+    if (!customFrom || !customTo) return null;
+    return { start: new Date(customFrom), end: new Date(customTo + 'T23:59:59') };
+  }
+  return getDateRange(periodKey);
+}
 
   async function moveChannel(channelId, newStatusKey, rejectionReason) {
     const oldChannels = [...channels];
@@ -503,6 +576,9 @@ export default function PipelinePage() {
   const filteredChannels = channels.filter(ch => {
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;
     if (period === 'all') return true;
+    if (dateType === 'activity_change') {
+  return activityChannelIds.has(ch.id);
+}
 
     let range;
     if (period === 'custom') {

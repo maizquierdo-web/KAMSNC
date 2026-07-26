@@ -284,6 +284,7 @@ export default function CalendarPage() {
   const [completedVisits, setCompletedVisits] = useState([]);
   const [channels, setChannels] = useState([]);
   const [activityChannelIds, setActivityChannelIds] = useState(new Set());
+  const [dateType, setDateType] = useState('creation');
   const [showNewModal, setShowNewModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [selectedKam, setSelectedKam] = useState('all');
@@ -323,7 +324,11 @@ export default function CalendarPage() {
       const [plannedRes, actionsRes, visitsRes] = await Promise.all([
         (() => {
           let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
-            .gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+           if (dateType === 'activity_change') {
+  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
+} else {
+  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+}
           if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
           else if (!isManager) q = q.eq('kam_id', user.id);
           return q;
@@ -331,7 +336,11 @@ export default function CalendarPage() {
         (() => {
           let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
             .not('planned_date', 'is', null)
-            .gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+           if (dateType === 'activity_change') {
+  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
+} else {
+  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
+}
           if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
           else if (!isManager) q = q.eq('user_id', user.id);
           return q;
@@ -476,7 +485,12 @@ setActivityChannelIds(ids);
   const dayEvents = getDayEvents(selectedDay);
   const totalPlanned = plannedVisits.length + plannedActions.filter(a => !a.is_completed).length;
   const totalCompleted = completedVisits.length + plannedActions.filter(a => a.is_completed).length;
-
+const visibleChannels = channels.filter(ch => {
+  if (dateType === 'activity_change') {
+    return activityChannelIds.has(ch.id);
+  }
+  return true;
+});
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -484,6 +498,15 @@ setActivityChannelIds(ids);
           <h1 className="text-xl font-extrabold tracking-tight">Agenda</h1>
           <p className="text-xs text-text-secondary">{weekLabel}</p>
         </div>
+       <div className="flex items-center gap-2">
+        <select
+  value={dateType}
+  onChange={(e) => setDateType(e.target.value)}
+  className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-sm"
+>
+  <option value="creation">Creación</option>
+  <option value="activity_change">Cambios de actividad</option>
+</select>
         <button onClick={() => setShowNewModal(true)}
           className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors">
           <Plus size={14} /> Planificar

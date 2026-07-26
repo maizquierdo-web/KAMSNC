@@ -373,7 +373,7 @@ export default function PipelinePage() {
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
 
   useEffect(() => {
-    if (dateType !== 'creation' && period !== 'all' && !loadingActivities) {
+   if (dateType === 'activity_change' && period !== 'all' && !loadingActivities) {
       enrichChannelsWithActivity();
     }
   }, [dateType, period]);
@@ -615,7 +615,7 @@ export default function PipelinePage() {
               <div className="flex-1 text-xs text-[#5a6078] font-medium">{periodLabel}</div>
             )}
             <div className="flex flex-col gap-1">
-              {[{ key: 'creation', label: 'Creación' }, { key: 'activity', label: 'Actividad' }].map(dt => (
+              [{ key: 'creation', label: 'Creación' }, { key: 'activity_change', label: 'Cambios de actividad' }].map(dt => (
                 <button key={dt.key} onClick={() => setDateType(dt.key)}
                   className="px-2 py-0.5 rounded text-[9px] font-bold transition-all"
                   style={{

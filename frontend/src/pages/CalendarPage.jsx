@@ -20,6 +20,29 @@ function addDays(date, n) { const d = new Date(date); d.setDate(d.getDate() + n)
 function isSameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
 function formatDateKey(date) { const p = (n) => String(n).padStart(2, '0'); return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}`; }
 
+function getDateRange(period) {
+  const now = new Date();
+  const end = new Date(now);
+  const start = new Date(now);
+
+  if (period === '7d') start.setDate(start.getDate() - 6);
+  else if (period === '14d') start.setDate(start.getDate() - 13);
+  else if (period === '30d') start.setDate(start.getDate() - 29);
+  else if (period === '90d') start.setDate(start.getDate() - 89);
+  else return null;
+
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+function getPeriodRange(periodKey, customFrom, customTo) {
+  if (periodKey === 'custom') {
+    if (!customFrom || !customTo) return null;
+    return { start: new Date(customFrom), end: new Date(customTo + 'T23:59:59') };
+  }
+  return getDateRange(periodKey);
+}
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const TYPE_CONFIG = {
@@ -260,6 +283,7 @@ export default function CalendarPage() {
   const [plannedActions, setPlannedActions] = useState([]);
   const [completedVisits, setCompletedVisits] = useState([]);
   const [channels, setChannels] = useState([]);
+  const [activityChannelIds, setActivityChannelIds] = useState(new Set());
   const [showNewModal, setShowNewModal] = useState(false);
   const [toast, setToast] = useState(null);
   const [selectedKam, setSelectedKam] = useState('all');

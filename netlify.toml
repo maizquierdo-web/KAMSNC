@@ -1,7 +1,12 @@
 [build]
   base = "frontend"
-  command = "npm run build"
+  command = "npm ci --include=dev && npm run build"
   publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20.19.0"
+  NPM_VERSION = "10.8.2"
+  NPM_FLAGS = "--include=dev"
 
 # SPA: redirigir todas las rutas a index.html
 [[redirects]]

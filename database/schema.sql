@@ -49,6 +49,18 @@ CREATE TABLE account_plans (
   completion_pct         integer DEFAULT 0
 );
 
+CREATE TABLE business_cases (
+  id                     uuid NOT NULL DEFAULT gen_random_uuid(),
+  channel_id             uuid NOT NULL UNIQUE,
+  file_name              text NOT NULL,
+  storage_path           text NOT NULL,
+  file_size              integer,
+  file_type              text,
+  uploaded_by            uuid NOT NULL,
+  created_at             timestamptz DEFAULT now(),
+  updated_at             timestamptz DEFAULT now()
+);
+
 CREATE TABLE alerts (
   id                     uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id                uuid NOT NULL,

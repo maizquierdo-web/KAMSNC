@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
-import AccountPlan from '../components/AccountPlan';
+import BusinessCase from '../components/BusinessCase';
 import PreVisitBrief from '../components/PreVisitBrief';
 import ChannelClassification from '../components/ChannelClassification';
 import ClassificationSelector from '../components/ClassificationSelector';
@@ -635,7 +635,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       </div>
 
       <div className="mb-4">
-        <AccountPlan channelId={channelId} channelName={channel.name} />
+        <BusinessCase channelId={channelId} />
       </div>
 
       <div className="mb-4">

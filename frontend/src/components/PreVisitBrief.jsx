@@ -39,12 +39,12 @@ export default function PreVisitBrief({ channelId, channelName }) {
     setBrief(null);
 
     try {
-      const [channelRes, visitsRes, planRes, alertsRes, playbookRes] = await Promise.allSettled([
+      const [channelRes, visitsRes, businessCaseRes, alertsRes, playbookRes] = await Promise.allSettled([
         supabase.from('channels').select('*').eq('id', channelId).single(),
         supabase.from('visits').select('*, channels(name)')
           .eq('channel_id', channelId).order('checkin_at', { ascending: false }).limit(10),
-        supabase.from('account_plans').select('*, account_plan_actions(*)')
-          .eq('channel_id', channelId).order('year', { ascending: false }).limit(1),
+        supabase.from('business_cases').select('file_name, updated_at')
+          .eq('channel_id', channelId).limit(1),
         supabase.from('alerts').select('*')
           .eq('channel_id', channelId).eq('is_dismissed', false),
         supabase.from('kam_playbook').select('section, content')
@@ -53,7 +53,7 @@ export default function PreVisitBrief({ channelId, channelName }) {
 
       const channel  = channelRes.status === 'fulfilled' ? channelRes.value.data : null;
       const visits   = visitsRes.status === 'fulfilled' ? (visitsRes.value.data || []) : [];
-      const plan     = planRes.status === 'fulfilled' ? (planRes.value.data?.[0] || null) : null;
+      const businessCase = businessCaseRes.status === 'fulfilled' ? (businessCaseRes.value.data?.[0] || null) : null;
       const alerts   = alertsRes.status === 'fulfilled' ? (alertsRes.value.data || []) : [];
       const playbook = playbookRes.status === 'fulfilled' ? (playbookRes.value.data || []) : [];
 
@@ -65,8 +65,6 @@ export default function PreVisitBrief({ channelId, channelName }) {
       const daysSinceVisit = lastVisit
         ? Math.floor((Date.now() - new Date(lastVisit.checkin_at).getTime()) / 86400000)
         : null;
-
-      const pendingActions = plan?.account_plan_actions?.filter(a => a.status !== 'completed') || [];
 
       const context = `
 DATOS DEL CANAL:
@@ -92,11 +90,9 @@ ${visits.length === 0 ? '- Sin visitas registradas' : visits.slice(0, 5).map(v =
 - Total visitas: ${visits.length} | Positivas: ${positiveCount} | Negativas: ${negativeCount}
 - Días desde última visita: ${daysSinceVisit !== null ? daysSinceVisit : 'Nunca visitado'}
 
-PLAN DE CUENTA ${plan ? `(${plan.year})` : ''}:
-${plan ? `- Objetivo: ${plan.objective || 'No definido'}
-- Estrategia: ${plan.strategy || 'No definida'}
-- Cumplimiento: ${plan.completion_pct || 0}%
-- Acciones pendientes: ${pendingActions.length > 0 ? pendingActions.map(a => a.title).join(', ') : 'Ninguna'}` : '- Sin plan de cuenta'}
+BUSINESS CASE:
+${businessCase ? `- Documento: ${businessCase.file_name}
+- Actualizado: ${new Date(businessCase.updated_at).toLocaleDateString('es-ES')}` : '- Business Case no adjuntado'}
 
 ALERTAS ACTIVAS: ${alerts.length > 0 ? alerts.map(a => a.title).join(', ') : 'Ninguna'}
 `;

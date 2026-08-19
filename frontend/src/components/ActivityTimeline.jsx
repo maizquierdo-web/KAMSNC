@@ -310,9 +310,6 @@ export default function ActivityTimeline({ channel }) {
               return (
                 <button key={t.key} onClick={() => setNewForm(p => ({ ...p, interaction_type: t.key }))}
                   className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
-                  style={{ background: sel ? cfg.bg.replace('bg-', '').includes('[') ? cfg.bg.replace('bg-[', '').replace(']','') : undefined : '#f7f8fa',
-                    border: `1px solid ${sel ? cfg.color : '#dde1e8'}`, color: sel ? cfg.color : '#8b90a0' }}
-                  className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all ${sel ? '' : ''}`}
                   style={{ background: sel ? (cfg.color + '15') : '#f7f8fa', border: `1px solid ${sel ? cfg.color : '#dde1e8'}`, color: sel ? cfg.color : '#8b90a0' }}>
                   {t.icon} {t.label}
                 </button>

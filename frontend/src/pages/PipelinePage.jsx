@@ -691,7 +691,7 @@ export default function PipelinePage() {
               <div className="flex-1 text-xs text-[#5a6078] font-medium">{periodLabel}</div>
             )}
             <div className="flex flex-col gap-1">
-              [{ key: 'creation', label: 'Creación' }, { key: 'activity_change', label: 'Cambios de actividad' }].map(dt => (
+              {[{ key: 'creation', label: 'Creación' }, { key: 'activity_change', label: 'Cambios de actividad' }].map(dt => (
                 <button key={dt.key} onClick={() => setDateType(dt.key)}
                   className="px-2 py-0.5 rounded text-[9px] font-bold transition-all"
                   style={{

@@ -512,6 +512,7 @@ const visibleChannels = channels.filter(ch => {
           <Plus size={14} /> Planificar
         </button>
       </div>
+      </div>
 
       {/* Selector de KAM (solo para coordinadores+) */}
       {isManager && teamKams.length > 0 && (

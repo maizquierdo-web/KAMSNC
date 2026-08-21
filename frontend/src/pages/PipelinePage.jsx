@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { useChannelTypes } from '../hooks/useChannelTypes';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
-import { PIPELINE_CONFIG, STATUS_CONFIG, STATUS_LIST, stageToStatus } from '../lib/crmConstants';
+import {
+  PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, stageToStatus,
+} from '../lib/crmConstants';
 import {
   Loader2, ChevronRight, ChevronDown, X, Check, Filter,
   Calendar, Users, TrendingUp, Clock, Building2
@@ -816,6 +818,7 @@ export default function PipelinePage() {
       {pendingReject && (
         <RejectReasonModal
           channelName={channels.find(c => c.id === pendingReject.channelId)?.name || ''}
+          statusKey={pendingReject.statusKey}
           statusLabel={STATUS_LIST.find(s => s.key === pendingReject.statusKey)?.label || ''}
           onConfirm={(reason) => { moveChannel(pendingReject.channelId, pendingReject.statusKey, reason); setPendingReject(null); }}
           onCancel={() => setPendingReject(null)}
@@ -825,8 +828,16 @@ export default function PipelinePage() {
   );
 }
 
-function RejectReasonModal({ channelName, statusLabel, onConfirm, onCancel }) {
+function RejectReasonModal({ channelName, statusKey, statusLabel, onConfirm, onCancel }) {
   const [reason, setReason] = useState('');
+  const [details, setDetails] = useState('');
+  const reasonOptions = REJECTION_REASON_OPTIONS[statusKey] || [];
+
+  function handleConfirm() {
+    const extraDetails = details.trim();
+    onConfirm(extraDetails ? `${reason}. ${extraDetails}` : reason);
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white border border-surface-3 rounded-2xl w-full max-w-sm p-5">
@@ -834,17 +845,29 @@ function RejectReasonModal({ channelName, statusLabel, onConfirm, onCancel }) {
         <p className="text-xs text-text-secondary mb-3">
           Vas a mover <strong>{channelName}</strong> a <strong>{statusLabel}</strong>. Indica el motivo:
         </p>
-        <textarea value={reason} onChange={(e) => setReason(e.target.value)}
-          placeholder="Ej: No encaja con el perfil, sin presupuesto, no responde..."
+        <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+          Motivo
+        </label>
+        <select value={reason} onChange={(e) => setReason(e.target.value)}
+          className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm text-text-primary focus:outline-none focus:border-brand-500 mb-3"
+          autoFocus>
+          <option value="">Selecciona un motivo...</option>
+          {reasonOptions.map(option => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+          Información adicional (opcional)
+        </label>
+        <textarea value={details} onChange={(e) => setDetails(e.target.value)}
+          placeholder="Añade más información si es necesario..."
           rows={3}
           className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted resize-none focus:outline-none focus:border-brand-500 mb-3"
-          autoFocus />
+        />
         <div className="flex gap-2">
           <button onClick={onCancel}
             className="flex-1 py-2.5 border border-surface-3 text-text-secondary text-sm font-semibold rounded-xl hover:bg-surface-1 transition-colors">
             Cancelar
           </button>
-          <button onClick={() => onConfirm(reason.trim())} disabled={!reason.trim()}
+          <button onClick={handleConfirm} disabled={!reason>
             className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors">
             Confirmar
           </button>

@@ -867,7 +867,7 @@ function RejectReasonModal({ channelName, statusKey, statusLabel, onConfirm, onC
             className="flex-1 py-2.5 border border-surface-3 text-text-secondary text-sm font-semibold rounded-xl hover:bg-surface-1 transition-colors">
             Cancelar
           </button>
-          <button onClick={handleConfirm} disabled={!reason>
+          <button onClick={handleConfirm} disabled={!reason}
             className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors">
             Confirmar
           </button>

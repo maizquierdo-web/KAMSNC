@@ -29,6 +29,23 @@ export const STATUS_LIST = Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({
   border: cfg.border_rgba,
 }));
 
+// ============ MOTIVOS DE DESCARTE ============
+// Se guardan en channels.rejection_reason junto con el detalle opcional.
+export const REJECTION_REASON_OPTIONS = {
+  rechazado: [
+    'Derivado a otro canal o partner',
+    'Ya colabora con Naturgy',
+    'Histórico o conflicto',
+  ],
+  cierre_sin_acuerdo: [
+    'Falta de interés',
+    'No le interesa colaborar',
+    'No le interesan las condiciones económicas',
+    'No forma parte de su estrategia actual',
+    'Complejidad administrativa o contractual',
+  ],
+};
+
 // ============ PIPELINE CONFIG (stage → label) ============
 export const PIPELINE_CONFIG = {
   lead:           'Lead',

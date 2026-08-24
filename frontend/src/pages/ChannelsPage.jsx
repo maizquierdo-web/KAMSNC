@@ -685,8 +685,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
 
       <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey}
         isCaes={classifications.some(classification =>
-          classification.channel_classification?.canal?.toLowerCase() === 'caes'
-        ) || channel.channel_type?.toLowerCase() === 'caes'} />
+          classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
+        ) || channel.channel_type?.trim().toLowerCase().includes('cae')
+          || Boolean(channel.potencial_caes)} />
 
       <div className="mb-4">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />

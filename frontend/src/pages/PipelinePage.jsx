@@ -355,6 +355,7 @@ export default function PipelinePage() {
   const [draggingId, setDraggingId] = useState(null);
   const [toast, setToast] = useState(null);
   const [pendingReject, setPendingReject] = useState(null);
+  const [pendingTransition, setPendingTransition] = useState(null);
   const scrollRef = useRef(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
@@ -541,10 +542,26 @@ export default function PipelinePage() {
   return getDateRange(periodKey);
 }
 
-  async function moveChannel(channelId, newStatusKey, rejectionReason) {
+  function isCaesChannel(channel) {
+    return (classificationsByChannel[channel.id] || []).some(classification =>
+      classification.canal_corto?.trim().toLowerCase().includes('cae')
+    ) || channel.channel_type?.trim().toLowerCase().includes('cae') || Boolean(channel.potencial_caes);
+  }
+
+  async function moveChannel(channelId, newStatusKey, rejectionReason, transitionData) {
     const oldChannels = [...channels];
     const channel = channels.find(c => c.id === channelId);
     if (!channel || channel.status === newStatusKey) return;
+
+    const isCaes = isCaesChannel(channel);
+    if (newStatusKey === 'en_proceso_alta' && !transitionData) {
+      setPendingTransition({ channelId, statusKey: newStatusKey, kind: 'onboarding', isCaes });
+      return;
+    }
+    if (newStatusKey === 'activo' && isCaes && !transitionData) {
+      setPendingTransition({ channelId, statusKey: newStatusKey, kind: 'active', isCaes: true });
+      return;
+    }
 
     if ((newStatusKey === 'rechazado' || newStatusKey === 'cierre_sin_acuerdo') && !rejectionReason) {
       setPendingReject({ channelId, statusKey: newStatusKey });
@@ -560,12 +577,13 @@ export default function PipelinePage() {
 
     setChannels(prev => prev.map(c =>
       c.id === channelId
-        ? { ...c, pipeline_stage: newPipelineStage, status: newStatusKey, pipeline_stage_changed_at: now, updated_at: now, rejection_reason: rejectionReason || c.rejection_reason }
+        ? { ...c, ...transitionData, pipeline_stage: newPipelineStage, status: newStatusKey, pipeline_stage_changed_at: now, updated_at: now, rejection_reason: rejectionReason || c.rejection_reason }
         : c
     ));
 
     try {
       const updateData = { pipeline_stage: newPipelineStage, status: newStatusKey, pipeline_stage_changed_at: now };
+      if (transitionData) Object.assign(updateData, transitionData);
       if (rejectionReason) updateData.rejection_reason = rejectionReason;
       if (newStatusKey !== 'rechazado' && newStatusKey !== 'cierre_sin_acuerdo') updateData.rejection_reason = null;
 
@@ -845,8 +863,83 @@ export default function PipelinePage() {
           onCancel={() => setPendingReject(null)}
         />
       )}
+      {pendingTransition && (
+        <PipelineTransitionModal
+          channel={channels.find(channel => channel.id === pendingTransition.channelId)}
+          kind={pendingTransition.kind}
+          isCaes={pendingTransition.isCaes}
+          onCancel={() => setPendingTransition(null)}
+          onConfirm={values => {
+            moveChannel(pendingTransition.channelId, pendingTransition.statusKey, null, values);
+            setPendingTransition(null);
+          }}
+        />
+      )}
     </div>
   );
+}
+
+const ONBOARDING_OPTIONS = [
+  ['documentation_requested', 'Documentación solicitada al canal'],
+  ['sauc_opening', 'Apertura de SAUC'],
+  ['delayed_by_channel', 'Proceso demorado por el canal'],
+  ['order_contract_activated', 'Pedido y contrato activados'],
+  ['user_created', 'Alta de usuario'],
+];
+const ROLE_OPTIONS = [['pending', 'Pendiente de definir'], ['promoter', 'Promotor'], ['promoter_ot', 'Promotor + OT'], ['promoter_ot_verifier', 'Promotor + OT + Verificador']];
+const CONTRACT_OPTIONS = [['pending', 'Pendiente de definir'], ['model_2_alternative_payer', 'Modelo 2 · Pagador alternativo'], ['model_3_savings_facilitator', 'Modelo 3 · Facilitador de ahorro']];
+const TIER_OPTIONS = [['pending', 'Pendiente de definir'], ['tier_a', 'Tramo A'], ['tier_b', 'Tramo B'], ['tier_c', 'Tramo C']];
+const OFFICE_OPTIONS = [['sinceo2', 'SINCEO2'], ['e_program', 'E-PROGRAM'], ['unassigned', 'Sin OT asignada']];
+const VERIFIER_OPTIONS = [['margube', 'MARGUBE'], ['eqa', 'EQA'], ['unassigned', 'Sin verificador asignado']];
+
+function TransitionField({ label, value, options, onChange }) {
+  return <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label} *</span>
+    <select value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
+      {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
+    </select>
+  </label>;
+}
+
+function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel }) {
+  const [values, setValues] = useState(kind === 'onboarding' ? {
+    onboarding_status: channel?.onboarding_status || 'documentation_requested',
+    caes_role: channel?.caes_role || 'pending',
+    caes_contract_model: channel?.caes_contract_model || 'pending',
+    caes_remuneration_tier: channel?.caes_remuneration_tier || 'pending',
+  } : {
+    caes_technical_office: channel?.caes_technical_office || 'unassigned',
+    caes_verifier: channel?.caes_verifier || 'unassigned',
+  });
+  const update = (field, value) => setValues(current => ({ ...current, [field]: value }));
+  const confirm = () => {
+    const stored = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value === 'pending' ? null : value]));
+    if (kind === 'onboarding') stored.onboarding_status_changed_at = new Date().toISOString();
+    onConfirm(stored);
+  };
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="w-full max-w-lg rounded-2xl border border-surface-3 bg-white p-5 shadow-2xl">
+      <h3 className="text-base font-bold text-text-primary">{kind === 'onboarding' ? 'Iniciar proceso de alta' : 'Activar canal CAEs'}</h3>
+      <p className="mb-4 mt-1 text-xs text-text-secondary">Completa la información de <strong>{channel?.name}</strong> antes de confirmar el cambio.</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {kind === 'onboarding' ? <>
+          <div className={isCaes ? 'sm:col-span-2' : ''}><TransitionField label="Estado del alta" value={values.onboarding_status} options={ONBOARDING_OPTIONS} onChange={value => update('onboarding_status', value)} /></div>
+          {isCaes && <>
+            <TransitionField label="Rol" value={values.caes_role} options={ROLE_OPTIONS} onChange={value => update('caes_role', value)} />
+            <TransitionField label="Modelo de contrato" value={values.caes_contract_model} options={CONTRACT_OPTIONS} onChange={value => update('caes_contract_model', value)} />
+            <TransitionField label="Tramo retributivo" value={values.caes_remuneration_tier} options={TIER_OPTIONS} onChange={value => update('caes_remuneration_tier', value)} />
+          </>}
+        </> : <>
+          <TransitionField label="Oficina técnica" value={values.caes_technical_office} options={OFFICE_OPTIONS} onChange={value => update('caes_technical_office', value)} />
+          <TransitionField label="Verificador" value={values.caes_verifier} options={VERIFIER_OPTIONS} onChange={value => update('caes_verifier', value)} />
+        </>}
+      </div>
+      <div className="mt-5 flex gap-2">
+        <button onClick={onCancel} className="flex-1 rounded-xl border border-surface-3 py-2.5 text-sm font-semibold text-text-secondary hover:bg-surface-1">Cancelar</button>
+        <button onClick={confirm} className="flex-1 rounded-xl bg-brand-500 py-2.5 text-sm font-bold text-white hover:bg-brand-600">Confirmar y mover</button>
+      </div>
+    </div>
+  </div>;
 }
 
 function RejectReasonModal({ channelName, statusKey, statusLabel, onConfirm, onCancel }) {

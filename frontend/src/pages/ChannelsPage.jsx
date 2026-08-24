@@ -11,7 +11,7 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
-import { ChannelReassign, BulkReassignModal } from '../components/ChannelReassign';
+import { BulkReassignModal } from '../components/ChannelReassign';
 import AddressFields from '../components/AddressFields';
 import { useChannelTypes } from '../hooks/useChannelTypes';
 import { validatePhone, validateEmail, validateCIF } from '../lib/validators';
@@ -678,9 +678,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         )}
       </div>
 
-      <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} />
-
-      <ChannelReassign channel={channel} onReassigned={(kamId) => {
+      <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
       }} />
 

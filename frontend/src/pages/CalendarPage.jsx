@@ -69,6 +69,7 @@ const TYPE_CONFIG = {
   whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: '#16a34a', bg: '#e6f5ed', borderColor: '#16a34a' },
   meeting: { label: 'Reunión', icon: Users, color: '#E87A1E', bg: '#FEF3E8', borderColor: '#E87A1E' },
   linkedin: { label: 'LinkedIn', icon: Linkedin, color: '#0077b5', bg: '#e8f4fd', borderColor: '#0077b5' },
+  follow_up: { label: 'Seguimiento', icon: Clock, color: '#0f766e', bg: '#ecfdf5', borderColor: '#0f766e' },
   other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: '#f0f0f4', borderColor: '#5a6078' },
 };
 
@@ -606,28 +607,24 @@ export default function CalendarPage() {
     }
     setSummaryLoading(true);
     try {
-      let visitsQuery = supabase.from('planned_visits').select('kam_id, planned_date, is_completed');
-      let actionsQuery = supabase.from('channel_interactions')
-        .select('user_id, interaction_type, planned_date, is_completed').not('planned_date', 'is', null);
+      let activityQuery = supabase.from('channel_activity_feed')
+        .select('user_id, activity_type, status, scheduled_date')
+        .not('scheduled_date', 'is', null);
 
       if (range.start && range.end) {
         const from = formatDateKey(range.start);
         const to = formatDateKey(range.end);
-        visitsQuery = visitsQuery.gte('planned_date', from).lt('planned_date', to);
-        actionsQuery = actionsQuery.gte('planned_date', from).lt('planned_date', to);
+        activityQuery = activityQuery.gte('scheduled_date', from).lt('scheduled_date', to);
       }
 
       if (isManager && summaryKamIds.length > 0) {
-        visitsQuery = visitsQuery.in('kam_id', summaryKamIds);
-        actionsQuery = actionsQuery.in('user_id', summaryKamIds);
+        activityQuery = activityQuery.in('user_id', summaryKamIds);
       } else if (!isManager) {
-        visitsQuery = visitsQuery.eq('kam_id', user.id);
-        actionsQuery = actionsQuery.eq('user_id', user.id);
+        activityQuery = activityQuery.eq('user_id', user.id);
       }
 
-      const [visitsRes, actionsRes] = await Promise.all([visitsQuery, actionsQuery]);
-      if (visitsRes.error) throw visitsRes.error;
-      if (actionsRes.error) throw actionsRes.error;
+      const { data: activityData, error: activityError } = await activityQuery;
+      if (activityError) throw activityError;
 
       const rows = new Map();
       const ensureRow = (id, name) => {
@@ -647,21 +644,19 @@ export default function CalendarPage() {
         ensureRow(targetId, target?.full_name || profile?.full_name);
       }
 
-      const todayKey = formatDateKey(new Date());
-      const register = (id, type, plannedDate, completed) => {
+      const register = (id, type, status) => {
         const kam = teamKams.find(item => item.id === id);
         const row = ensureRow(id, kam?.full_name || (id === user.id ? profile?.full_name : 'KAM'));
         row.planned += 1;
         row.types[type] = (row.types[type] || 0) + 1;
-        if (completed === true) row.completed += 1;
+        if (status === 'completed') row.completed += 1;
         else {
           row.pending += 1;
-          if (plannedDate < todayKey) row.overdue += 1;
+          if (status === 'overdue') row.overdue += 1;
         }
       };
 
-      (visitsRes.data || []).forEach(item => register(item.kam_id, 'visit', item.planned_date, item.is_completed));
-      (actionsRes.data || []).forEach(item => register(item.user_id, item.interaction_type || 'other', item.planned_date, item.is_completed));
+      (activityData || []).forEach(item => register(item.user_id, item.activity_type || 'other', item.status));
 
       setSummaryRows([...rows.values()].sort((a, b) => a.name.localeCompare(b.name, 'es')));
     } catch (err) {
@@ -680,129 +675,65 @@ export default function CalendarPage() {
       const endStr = formatDateKey(weekEnd);
 
       const todayKey = formatDateKey(new Date());
-      const tomorrowKey = formatDateKey(addDays(new Date(), 1));
-      const todayInSelectedWeek = todayKey >= startStr && todayKey < endStr;
-      const overdueEndStr = todayKey < endStr ? todayKey : endStr;
-      const hasOverdueRange = startStr < overdueEndStr;
-      const upcomingStartStr = tomorrowKey > startStr ? tomorrowKey : startStr;
-      const hasUpcomingRange = upcomingStartStr < endStr;
-      const [plannedRes, actionsRes, visitsRes, overdueVisitsRes, overdueActionsRes, todayVisitsRes, todayActionsRes, upcomingVisitsRes, upcomingActionsRes] = await Promise.all([
-        (() => {
-          let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
-           if (dateType === 'activity_change') {
-  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
-} else {
-  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
-}
-          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
-          else if (!isManager) q = q.eq('kam_id', user.id);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
-            .not('planned_date', 'is', null)
-           if (dateType === 'activity_change') {
-  q = q.gte('activity_date', startStr).lt('activity_date', endStr).order('activity_time');
-} else {
-  q = q.gte('planned_date', startStr).lt('planned_date', endStr).order('planned_time');
-}
-          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
-          else if (!isManager) q = q.eq('user_id', user.id);
-          return q;
-        })(),
-        (() => {
-          let q = supabase.from('visits').select('id, channel_id, kam_id, checkin_at, channels(name), profiles(full_name)')
-            .gte('checkin_at', currentWeekStart.toISOString()).lt('checkin_at', weekEnd.toISOString());
-          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
-          else if (!isManager) q = q.eq('kam_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!hasOverdueRange) return Promise.resolve({ data: [] });
-          let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
-            .gte('planned_date', startStr).lt('planned_date', overdueEndStr)
-            .or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
-          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
-          else if (!isManager) q = q.eq('kam_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!hasOverdueRange) return Promise.resolve({ data: [] });
-          let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
-            .not('planned_date', 'is', null).gte('planned_date', startStr).lt('planned_date', overdueEndStr)
-            .or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
-          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
-          else if (!isManager) q = q.eq('user_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!todayInSelectedWeek) return Promise.resolve({ count: 0 });
-          let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
-            .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
-          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
-          else if (!isManager) q = q.eq('kam_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!todayInSelectedWeek) return Promise.resolve({ count: 0 });
-          let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
-            .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
-          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
-          else if (!isManager) q = q.eq('user_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!hasUpcomingRange) return Promise.resolve({ count: 0 });
-          let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
-            .gte('planned_date', upcomingStartStr).lt('planned_date', endStr)
-            .or('is_completed.eq.false,is_completed.is.null');
-          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
-          else if (!isManager) q = q.eq('kam_id', user.id);
-          return q;
-        })(),
-        (() => {
-          if (!hasUpcomingRange) return Promise.resolve({ count: 0 });
-          let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
-            .gte('planned_date', upcomingStartStr).lt('planned_date', endStr)
-            .or('is_completed.eq.false,is_completed.is.null');
-          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
-          else if (!isManager) q = q.eq('user_id', user.id);
-          return q;
-        })(),
-      ]);
+      let activityQuery = supabase.from('channel_activity_feed')
+        .select('*').gte('scheduled_date', startStr).lt('scheduled_date', endStr)
+        .order('scheduled_date').order('scheduled_time');
+      if (selectedKam !== 'all') activityQuery = activityQuery.eq('user_id', selectedKam);
+      else if (!isManager) activityQuery = activityQuery.eq('user_id', user.id);
 
-      setPlannedVisits(plannedRes.data || []);
-      setPlannedActions(actionsRes.data || []);
-      setCompletedVisits(visitsRes.data || []);
-      const overdue = [
-        ...(overdueVisitsRes.data || []).map(v => ({
-          _type: 'visit', _source: 'planned_visit', _sourceId: v.id,
-          _channelId: v.channel_id, _userId: v.kam_id,
-          planned_date: v.planned_date, planned_time: v.planned_time,
-          notes: v.notes, is_completed: false,
-          _channelName: v.channels?.name, _channelAddress: v.channels?.address,
-          _kamName: selectedKam === 'all' ? v.profiles?.full_name : null,
-        })),
-        ...(overdueActionsRes.data || []).map(a => ({
-          _type: a.interaction_type, _source: 'interaction', _sourceId: a.id,
-          _channelId: a.channel_id, _userId: a.user_id,
-          planned_date: a.planned_date, planned_time: a.planned_time,
-          notes: a.notes, is_completed: false,
-          _channelName: a.channels?.name, _channelAddress: a.channels?.address,
-          _kamName: selectedKam === 'all' ? a.profiles?.full_name : null,
-        })),
-      ].sort((a, b) => `${a.planned_date} ${a.planned_time || ''}`.localeCompare(`${b.planned_date} ${b.planned_time || ''}`));
+      const { data: feedData, error: feedError } = await activityQuery;
+      if (feedError) throw feedError;
+      const feed = feedData || [];
+      const channelIds = [...new Set(feed.map(item => item.channel_id).filter(Boolean))];
+      const userIds = [...new Set(feed.map(item => item.user_id).filter(Boolean))];
+      const [channelRes, profileRes] = await Promise.all([
+        channelIds.length ? supabase.from('channels').select('id, name, address').in('id', channelIds) : Promise.resolve({ data: [] }),
+        userIds.length ? supabase.from('profiles').select('id, full_name').in('id', userIds) : Promise.resolve({ data: [] }),
+      ]);
+      if (channelRes.error) throw channelRes.error;
+      if (profileRes.error) throw profileRes.error;
+      const channelMap = new Map((channelRes.data || []).map(item => [item.id, item]));
+      const profileMap = new Map((profileRes.data || []).map(item => [item.id, item]));
+      const enrich = item => ({
+        ...item,
+        id: item.source_id,
+        planned_date: item.scheduled_date,
+        planned_time: item.scheduled_time,
+        interaction_type: item.activity_type,
+        is_completed: item.status === 'completed',
+        channels: channelMap.get(item.channel_id),
+        profiles: profileMap.get(item.user_id),
+        _feedSource: item.source_table === 'planned_visits' ? 'planned_visit'
+          : item.source_table === 'visits' ? 'completed_visit'
+            : item.source_table,
+      });
+      const enriched = feed.map(enrich);
+      setPlannedVisits(enriched.filter(item => item.source_table === 'planned_visits'));
+      setPlannedActions(enriched.filter(item => ['channel_interactions', 'visit_followup'].includes(item.source_table)));
+      setCompletedVisits(enriched.filter(item => item.source_table === 'visits').map(item => ({
+        ...item, checkin_at: item.occurred_at,
+      })));
+      const overdue = enriched.filter(item => item.status === 'overdue').map(item => ({
+        _type: item.activity_type,
+        _source: item._feedSource,
+        _sourceId: item.source_id,
+        _channelId: item.channel_id,
+        _userId: item.user_id,
+        planned_date: item.scheduled_date,
+        planned_time: item.scheduled_time,
+        notes: item.notes,
+        is_completed: false,
+        _channelName: item.channels?.name,
+        _channelAddress: item.channels?.address,
+        _kamName: selectedKam === 'all' ? item.profiles?.full_name : null,
+      }));
       setOverdueEvents(overdue);
       setPriorityCounts({
         overdue: overdue.length,
-        today: (todayVisitsRes.count || 0) + (todayActionsRes.count || 0),
-        upcoming: (upcomingVisitsRes.count || 0) + (upcomingActionsRes.count || 0),
+        today: enriched.filter(item => item.scheduled_date === todayKey && !item.is_completed).length,
+        upcoming: enriched.filter(item => item.scheduled_date > todayKey && !item.is_completed).length,
       });
-      const ids = new Set();
-(plannedRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
-(actionsRes.data || []).forEach(a => { if (a?.channel_id) ids.add(a.channel_id); });
-(visitsRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
-setActivityChannelIds(ids);
+      setActivityChannelIds(new Set(channelIds));
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }
@@ -852,6 +783,8 @@ setActivityChannelIds(ids);
     try {
       if (event._source === 'planned_visit') {
         await supabase.from('planned_visits').delete().eq('id', event._sourceId);
+      } else if (event._source === 'visit_followup') {
+        await supabase.from('visits').update({ next_action_date: null, next_steps: null }).eq('id', event._sourceId);
       } else {
         await supabase.from('channel_interactions').delete().eq('id', event._sourceId);
       }
@@ -869,12 +802,26 @@ setActivityChannelIds(ids);
     if (!event) return;
     try {
       const completedNotes = [event.notes, notes].filter(Boolean).join('\n\nResultado: ');
-      const { error: completeError } = await supabase.from('channel_interactions').update({
-        is_completed: true,
-        result,
-        notes: completedNotes || null,
-        created_at: new Date().toISOString(),
-      }).eq('id', event._sourceId);
+      let completionQuery;
+      if (event._source === 'planned_visit') {
+        completionQuery = supabase.from('planned_visits').update({
+          is_completed: true,
+          notes: completedNotes || null,
+        }).eq('id', event._sourceId);
+      } else if (event._source === 'visit_followup') {
+        completionQuery = supabase.from('visits').update({
+          next_action_date: null,
+          next_steps: null,
+        }).eq('id', event._sourceId);
+      } else {
+        completionQuery = supabase.from('channel_interactions').update({
+          is_completed: true,
+          result,
+          notes: completedNotes || null,
+          created_at: new Date().toISOString(),
+        }).eq('id', event._sourceId);
+      }
+      const { error: completeError } = await completionQuery;
       if (completeError) throw completeError;
 
       if (nextAction) {
@@ -904,8 +851,17 @@ setActivityChannelIds(ids);
     const event = eventToReschedule;
     if (!event) return;
     try {
-      const table = event._source === 'planned_visit' ? 'planned_visits' : 'channel_interactions';
-      const { error } = await supabase.from(table).update(changes).eq('id', event._sourceId);
+      let updateQuery;
+      if (event._source === 'visit_followup') {
+        updateQuery = supabase.from('visits').update({
+          next_action_date: changes.planned_date,
+          next_steps: changes.notes,
+        }).eq('id', event._sourceId);
+      } else {
+        const table = event._source === 'planned_visit' ? 'planned_visits' : 'channel_interactions';
+        updateQuery = supabase.from(table).update(changes).eq('id', event._sourceId);
+      }
+      const { error } = await updateQuery;
       if (error) throw error;
       setEventToReschedule(null);
       await loadWeekData();
@@ -925,6 +881,7 @@ setActivityChannelIds(ids);
     plannedVisits.filter(v => v.planned_date === key).forEach(v => {
       events.push({
         _type: 'visit', _source: 'planned_visit', _sourceId: v.id,
+        _channelId: v.channel_id, _userId: v.user_id,
         planned_date: v.planned_date, planned_time: v.planned_time, notes: v.notes, is_completed: v.is_completed,
         _channelName: v.channels?.name, _channelAddress: v.channels?.address,
         _kamName: selectedKam === 'all' ? v.profiles?.full_name : null,
@@ -934,7 +891,7 @@ setActivityChannelIds(ids);
     // Planned actions (interactions)
     plannedActions.filter(a => a.planned_date === key).forEach(a => {
       events.push({
-        _type: a.interaction_type, _source: 'interaction', _sourceId: a.id,
+        _type: a.interaction_type, _source: a._feedSource || 'channel_interactions', _sourceId: a.id,
         _channelId: a.channel_id, _userId: a.user_id,
         planned_date: a.planned_date, planned_time: a.planned_time, notes: a.notes, is_completed: a.is_completed,
         _channelName: a.channels?.name, _channelAddress: a.channels?.address,

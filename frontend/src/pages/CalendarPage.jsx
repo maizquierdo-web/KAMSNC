@@ -1149,15 +1149,24 @@ const visibleChannels = channels.filter(ch => {
                 {isManager && selectedKam === 'all' ? 'Visión automática de todo el equipo' : 'Actividad del KAM seleccionado'}
               </p>
             </div>
-            <select value={summaryPeriod} onChange={(e) => setSummaryPeriod(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
-              <option value="week">Semana seleccionada</option>
-              <option value="month">Mes actual</option>
-              <option value="quarter">Trimestre actual</option>
-              <option value="year">Año actual</option>
-              <option value="all">Acumulado</option>
-              <option value="custom">Periodo personalizado</option>
-            </select>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {isManager && (
+                <select value={selectedKam} onChange={(e) => setSelectedKam(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
+                  <option value="all">Todo el equipo</option>
+                  {teamKams.map(kam => <option key={kam.id} value={kam.id}>{kam.full_name}</option>)}
+                </select>
+              )}
+              <select value={summaryPeriod} onChange={(e) => setSummaryPeriod(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
+                <option value="week">Semana seleccionada</option>
+                <option value="month">Mes actual</option>
+                <option value="quarter">Trimestre actual</option>
+                <option value="year">Año actual</option>
+                <option value="all">Acumulado</option>
+                <option value="custom">Periodo personalizado</option>
+              </select>
+            </div>
           </div>
 
           {summaryPeriod === 'custom' && (

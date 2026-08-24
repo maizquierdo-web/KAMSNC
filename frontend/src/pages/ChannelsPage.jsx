@@ -9,6 +9,7 @@ import ClassificationSelector from '../components/ClassificationSelector';
 import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
+import ChannelAttentionAlerts from '../components/ChannelAttentionAlerts';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
 import { BulkReassignModal } from '../components/ChannelReassign';
@@ -682,6 +683,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
       }} />
 
+      <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey} />
+
       <div className="mb-4">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />
       </div>
@@ -690,7 +693,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <CompanyAnalysis channel={channel} onChannelUpdate={setChannel} />
       </div>
 
-      <div className="mb-4">
+      <div id="channel-activity" className="mb-4 scroll-mt-20">
         <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
 
@@ -702,7 +705,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <VolumeEditor channel={channel} onChannelUpdate={setChannel} />
       </div>
 
-      <div className="mb-4">
+      <div id="channel-business-case" className="mb-4 scroll-mt-20">
         <BusinessCase channelId={channelId} />
       </div>
 

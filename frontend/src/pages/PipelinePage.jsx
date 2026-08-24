@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { useChannelTypes } from '../hooks/useChannelTypes';
@@ -345,6 +345,7 @@ function KamSelector({ kams, selected, onChange }) {
 export default function PipelinePage() {
   const { user, profile, isManager } = useAuthContext();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { typeMap } = useChannelTypes();
   const [channels, setChannels] = useState([]);
   const [activityChannelIds, setActivityChannelIds] = useState(new Set());
@@ -357,11 +358,11 @@ export default function PipelinePage() {
   const scrollRef = useRef(null);
   const [loadingActivities, setLoadingActivities] = useState(false);
 
-  const [period, setPeriod] = useState('all');
-  const [dateType, setDateType] = useState('creation');
-  const [selectedKam, setSelectedKam] = useState('all');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [period, setPeriod] = useState(() => searchParams.get('period') || 'all');
+  const [dateType, setDateType] = useState(() => searchParams.get('dateType') || 'creation');
+  const [selectedKam, setSelectedKam] = useState(() => searchParams.get('kam') || 'all');
+  const [customFrom, setCustomFrom] = useState(() => searchParams.get('from') || '');
+  const [customTo, setCustomTo] = useState(() => searchParams.get('to') || '');
 
   const [teamKams, setTeamKams] = useState([]);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
@@ -371,6 +372,16 @@ export default function PipelinePage() {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedKam !== 'all') params.set('kam', selectedKam);
+    if (period !== 'all') params.set('period', period);
+    if (dateType !== 'creation') params.set('dateType', dateType);
+    if (period === 'custom' && customFrom) params.set('from', customFrom);
+    if (period === 'custom' && customTo) params.set('to', customTo);
+    setSearchParams(params, { replace: true });
+  }, [selectedKam, period, dateType, customFrom, customTo, setSearchParams]);
 
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
   useEffect(() => {
@@ -573,7 +584,17 @@ export default function PipelinePage() {
     setDraggingId(null);
   }
 
-  function handleChannelClick(channelId) { navigate(`/channels?detail=${channelId}`); }
+  function handleChannelClick(channelId) {
+    const pipelineParams = new URLSearchParams();
+    if (selectedKam !== 'all') pipelineParams.set('kam', selectedKam);
+    if (period !== 'all') pipelineParams.set('period', period);
+    if (dateType !== 'creation') pipelineParams.set('dateType', dateType);
+    if (period === 'custom' && customFrom) pipelineParams.set('from', customFrom);
+    if (period === 'custom' && customTo) pipelineParams.set('to', customTo);
+    const query = pipelineParams.toString();
+    const returnTo = query ? `/pipeline?${query}` : '/pipeline';
+    navigate(`/channels?detail=${channelId}&returnTo=${encodeURIComponent(returnTo)}`);
+  }
 
   const filteredChannels = channels.filter(ch => {
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;

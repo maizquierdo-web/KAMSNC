@@ -184,7 +184,12 @@ CREATE TABLE channels (
   potencial_caes         text,
   potencial_venta_energia text,
   comunidad_autonoma     text,
-  potencial_energia      text
+  potencial_energia      text,
+  onboarding_status      text,
+  caes_role              text,
+  caes_contract_model    text,
+  caes_remuneration_tier text,
+  onboarding_status_changed_at timestamptz
 );
 
 CREATE TABLE kam_playbook (

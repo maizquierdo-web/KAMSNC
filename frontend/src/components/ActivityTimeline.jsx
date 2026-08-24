@@ -79,7 +79,7 @@ function formatFileSize(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-export default function ActivityTimeline({ channel }) {
+export default function ActivityTimeline({ channel, onActivityChange }) {
   const { user } = useAuthContext();
   const [activities, setActivities] = useState([]);
   const [planned, setPlanned] = useState([]);
@@ -118,7 +118,7 @@ export default function ActivityTimeline({ channel }) {
       const meetings = (meetingsRes.status === 'fulfilled' ? meetingsRes.value.data : []) || [];
 
       // Separate planned vs completed interactions
-      const completedInter = interactions.filter(i => i.is_completed !== false && !i.planned_date);
+      const completedInter = interactions.filter(i => i.is_completed === true || (i.is_completed !== false && !i.planned_date));
       const plannedInter = interactions.filter(i => i.is_completed === false || (i.planned_date && i.is_completed !== true));
 
       setPlanned(plannedInter.sort((a, b) => {
@@ -130,7 +130,8 @@ export default function ActivityTimeline({ channel }) {
         ...visits.map(v => ({
           _type: 'visit', _date: v.checkin_at, _id: `v-${v.id}`, _sourceId: v.id,
           result: v.result, duration: v.duration_minutes, notes: v.notes || v.result_notes,
-          objective: v.objective, nextSteps: v.next_steps, userId: v.kam_id,
+          objective: v.objective, nextSteps: v.next_steps,
+          nextActionDate: v.next_action_date, userId: v.kam_id,
         })),
         ...completedInter.map(i => ({
           _type: i.interaction_type, _date: i.created_at, _id: `i-${i.id}`, _sourceId: i.id, _source: 'interaction',
@@ -143,7 +144,7 @@ export default function ActivityTimeline({ channel }) {
           notes: n.content, authorName: n.profiles?.full_name, userId: n.user_id,
         })),
         ...meetings.map(m => ({
-          _type: 'meeting', _date: m.created_at, _id: `m-${m.id}`, _sourceId: m.id, _source: 'meeting',
+          _type: 'meeting', _date: m.meeting_date || m.created_at, _id: `m-${m.id}`, _sourceId: m.id, _source: 'meeting',
           meetingDate: m.meeting_date, attendees: m.attendees, notes: m.notes,
           fileName: m.file_name, fileSize: m.file_size, fileUrl: m.file_url,
           authorName: m.profiles?.full_name, userId: m.uploaded_by,
@@ -175,6 +176,7 @@ export default function ActivityTimeline({ channel }) {
       if (error) throw error;
       resetForm();
       loadAll();
+      onActivityChange?.();
     } catch (err) { console.error(err); }
     finally { setSavingForm(false); }
   }
@@ -183,6 +185,7 @@ export default function ActivityTimeline({ channel }) {
     try {
       await supabase.from('channel_interactions').update({ is_completed: true }).eq('id', id);
       loadAll();
+      onActivityChange?.();
     } catch (err) { console.error(err); }
   }
 
@@ -190,6 +193,7 @@ export default function ActivityTimeline({ channel }) {
     try {
       await supabase.from('channel_interactions').delete().eq('id', id);
       loadAll();
+      onActivityChange?.();
     } catch (err) { console.error(err); }
   }
 
@@ -200,6 +204,7 @@ export default function ActivityTimeline({ channel }) {
       await supabase.from('channel_notes').insert({ channel_id: channel.id, user_id: user.id, content: noteText.trim() });
       setNoteText(''); setFormMode(null);
       loadAll();
+      onActivityChange?.();
     } catch (err) { console.error(err); }
     finally { setSavingNote(false); }
   }
@@ -210,6 +215,7 @@ export default function ActivityTimeline({ channel }) {
       else if (activity._source === 'note') await supabase.from('channel_notes').delete().eq('id', activity._sourceId);
       else if (activity._source === 'meeting') await supabase.from('channel_meetings').delete().eq('id', activity._sourceId);
       setActivities(prev => prev.filter(a => a._id !== activity._id));
+      onActivityChange?.();
     } catch (err) { console.error(err); }
   }
 
@@ -235,7 +241,10 @@ export default function ActivityTimeline({ channel }) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Clock size={16} className="text-brand-500" />
-            <span className="text-sm font-bold text-text-primary">Actividad del canal</span>
+            <div>
+              <div className="text-sm font-bold text-text-primary">Historial de actividad</div>
+              <div className="text-[10px] text-text-muted">Relación comercial completa</div>
+            </div>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-surface-2 text-text-muted">{activities.length}</span>
           </div>
           <div className="flex gap-1.5">
@@ -488,6 +497,11 @@ export default function ActivityTimeline({ channel }) {
                       <div className="mt-1.5 px-2 py-1.5 bg-brand-50 border border-brand-200 rounded-lg">
                         <div className="text-[9px] font-bold text-brand-500 uppercase tracking-wider">Próximos pasos</div>
                         <div className="text-xs text-text-secondary mt-0.5">{activity.nextSteps}</div>
+                        {activity.nextActionDate && (
+                          <div className="mt-1 text-[10px] font-semibold text-brand-500">
+                            Fecha: {new Date(activity.nextActionDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

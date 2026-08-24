@@ -1039,6 +1039,7 @@ function NewChannelForm({ onBack, onSaved, types }) {
 // ============ PÁGINA PRINCIPAL ============
 export default function ChannelsPage() {
   const { user, isManager } = useAuthContext();
+  const navigate = useNavigate();
   const { types, typeMap } = useChannelTypes();
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1048,14 +1049,16 @@ export default function ChannelsPage() {
   const [search, setSearch] = useState('');
   const [showBulkReassign, setShowBulkReassign] = useState(false);
   const [classificationsByChannel, setClassificationsByChannel] = useState({});
+  const [returnTo, setReturnTo] = useState('');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const detailId = params.get('detail');
+    const requestedReturn = params.get('returnTo');
     if (detailId) {
       setSelectedId(detailId);
       setView('detail');
-      window.history.replaceState({}, '', '/channels');
+      if (requestedReturn?.startsWith('/pipeline')) setReturnTo(requestedReturn);
     }
   }, []);
 
@@ -1117,7 +1120,14 @@ export default function ChannelsPage() {
   function handleSelect(id) {
     if (id === 'new') { setView('new'); } else { setSelectedId(id); setView('detail'); }
   }
-  function handleBack() { setView('list'); setSelectedId(null); }
+  function handleBack() {
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
+    setView('list');
+    setSelectedId(null);
+  }
   function handleSaved(newId) { loadChannels(); setSelectedId(newId); setView('detail'); }
 
   if (view === 'detail' && selectedId) return <ChannelDetail channelId={selectedId} onBack={handleBack} types={types} typeMap={typeMap} />;

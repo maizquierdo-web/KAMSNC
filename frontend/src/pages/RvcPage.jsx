@@ -1,15 +1,30 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
-import PeriodSelector, { getPeriodRange } from '../components/PeriodSelector';
 import { VOLUME_UNITS, formatVolume } from '../components/VolumeEditor';
-import { Loader2, TrendingUp, Target, Building2, Zap, MapPin, Sun } from 'lucide-react';
+import { Loader2, TrendingUp, Target, Building2, Zap, MapPin, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
+
+function getSemesterRange(offset = 0) {
+  const now = new Date();
+  const currentIndex = now.getFullYear() * 2 + (now.getMonth() >= 6 ? 1 : 0);
+  const targetIndex = currentIndex + offset;
+  const year = Math.floor(targetIndex / 2);
+  const half = targetIndex % 2;
+  const startMonth = half * 6;
+  return {
+    from: new Date(year, startMonth, 1, 0, 0, 0, 0),
+    to: new Date(year, startMonth + 6, 0, 23, 59, 59, 999),
+    label: `${half === 0 ? '1º' : '2º'} semestre ${year}`,
+  };
+}
 
 // ============ PÁGINA RVC ============
 export default function RvcPage() {
-  const { user, isManager } = useAuthContext();
-  const [period, setPeriod] = useState('this_month');
-  const [range, setRange] = useState(() => getPeriodRange('this_month'));
+  const { user, profile, isManager } = useAuthContext();
+  const [semesterOffset, setSemesterOffset] = useState(0);
+  const range = getSemesterRange(semesterOffset);
+  const [selectedUser, setSelectedUser] = useState('all');
+  const [availableUsers, setAvailableUsers] = useState([]);
   const [channels, setChannels] = useState([]);
   const [allActiveChannels, setAllActiveChannels] = useState([]);
   const [visits, setVisits] = useState([]);
@@ -17,11 +32,16 @@ export default function RvcPage() {
 
   useEffect(() => {
     if (user && range?.from && range?.to) loadData();
-  }, [user, range]);
+  }, [user, semesterOffset, selectedUser]);
 
-  function handlePeriodChange(newPeriod, newRange) {
-    setPeriod(newPeriod);
-    setRange(newRange);
+  useEffect(() => {
+    if (user && isManager) loadAvailableUsers();
+  }, [user, isManager]);
+
+  async function loadAvailableUsers() {
+    const { data } = await supabase.from('profiles').select('id, full_name, role')
+      .eq('is_active', true).in('role', ['kam', 'coordinator', 'manager', 'director']).order('full_name');
+    setAvailableUsers(data || []);
   }
 
   async function loadData() {
@@ -37,6 +57,7 @@ export default function RvcPage() {
         .gte('created_at', fromISO)
         .lte('created_at', toISO);
       if (!isManager) chQuery = chQuery.eq('assigned_to', user.id);
+      else if (selectedUser !== 'all') chQuery = chQuery.eq('assigned_to', selectedUser);
       const { data: chData } = await chQuery;
       setChannels(chData || []);
 
@@ -46,6 +67,7 @@ export default function RvcPage() {
         .select('id, volume_amount, volume_unit')
         .eq('status', 'activo');
       if (!isManager) activeQuery = activeQuery.eq('assigned_to', user.id);
+      else if (selectedUser !== 'all') activeQuery = activeQuery.eq('assigned_to', selectedUser);
       const { data: activeData } = await activeQuery;
       setAllActiveChannels(activeData || []);
 
@@ -56,6 +78,7 @@ export default function RvcPage() {
         .gte('checkin_at', fromISO)
         .lte('checkin_at', toISO);
       if (!isManager) vQuery = vQuery.eq('kam_id', user.id);
+      else if (selectedUser !== 'all') vQuery = vQuery.eq('kam_id', selectedUser);
       const { data: vData } = await vQuery;
       setVisits(vData || []);
     } catch (err) {
@@ -139,8 +162,46 @@ export default function RvcPage() {
         <h1 className="text-xl font-extrabold tracking-tight">RVC</h1>
       </div>
 
-      {/* Selector de periodo (componente compartido con DashboardPage) */}
-      <PeriodSelector period={period} range={range} onChange={handlePeriodChange} />
+      {/* El RVC se calcula siempre por semestres naturales */}
+      <div className="mb-5 bg-surface-1 border border-surface-3 rounded-2xl p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Periodo de cálculo</div>
+            <div className="text-sm font-bold text-text-primary mt-0.5">{range.label}</div>
+            <div className="text-[10px] text-text-secondary mt-0.5">
+              {range.from.toLocaleDateString('es-ES')} — {range.to.toLocaleDateString('es-ES')}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSemesterOffset(value => value - 1)}
+              className="w-9 h-9 rounded-lg border border-surface-3 bg-surface-0 hover:bg-surface-2 flex items-center justify-center text-text-secondary"
+              title="Semestre anterior"><ChevronLeft size={16} /></button>
+            {semesterOffset !== 0 && (
+              <button onClick={() => setSemesterOffset(0)}
+                className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-brand-500">Semestre actual</button>
+            )}
+            <button onClick={() => setSemesterOffset(value => value + 1)} disabled={semesterOffset >= 0}
+              className="w-9 h-9 rounded-lg border border-surface-3 bg-surface-0 hover:bg-surface-2 disabled:opacity-35 flex items-center justify-center text-text-secondary"
+              title="Semestre siguiente"><ChevronRight size={16} /></button>
+          </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-surface-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Datos mostrados</div>
+            <div className="text-xs text-text-secondary">
+              {isManager ? (selectedUser === 'all' ? 'Todo el equipo' : availableUsers.find(item => item.id === selectedUser)?.full_name || 'Usuario') : profile?.full_name || 'Mis datos'}
+            </div>
+          </div>
+          {isManager && (
+            <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}
+              className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
+              <option value="all">Todo el equipo</option>
+              {availableUsers.map(item => <option key={item.id} value={item.id}>{item.full_name}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
 
       {/* KPI Cards */}
       {loading ? (

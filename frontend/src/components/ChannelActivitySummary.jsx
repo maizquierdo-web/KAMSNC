@@ -119,11 +119,12 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
     setReassigning(true);
     setReassignError('');
     try {
-      const { data, error } = await supabase.from('channels')
-        .update({ assigned_to: kam.id }).eq('id', channel.id)
-        .select('id, assigned_to').single();
+      const { data, error } = await supabase.rpc('reassign_channel_open', {
+        target_channel_id: channel.id,
+        target_assignee_id: kam.id,
+      });
       if (error) throw error;
-      if (!data || data.assigned_to !== kam.id) throw new Error('No se pudo completar la reasignación');
+      if (data !== channel.id) throw new Error('No se pudo completar la reasignación');
       setSummary(prev => ({ ...prev, responsible: kam.full_name, responsibleZone: kam.zone }));
       setReassignOpen(false);
       onReassigned?.(kam.id, kam);

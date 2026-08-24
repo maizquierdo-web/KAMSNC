@@ -567,7 +567,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 </div>
               </div>
               <button onClick={() => setCopilotOpen(true)}
-                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#12304a] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#19405f]">
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-[#BFDDE6] bg-[#EAF4F8] px-3 py-2 text-xs font-bold text-[#174A5B] transition-colors hover:border-[#9FCED9] hover:bg-[#DCEEF3] [&>svg]:text-[#0F9F95]">
                 <Sparkles size={14} /> Analizar con IA
               </button>
               <button onClick={startEdit}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuthContext } from './AuthProvider';
 import {
   ArrowRightLeft, CalendarDays, Check, ChevronDown, Clock3, Loader2, TrendingUp,
 } from 'lucide-react';
@@ -45,19 +44,18 @@ function nextByDate(items) {
 }
 
 export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned }) {
-  const { isManager } = useAuthContext();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [kams, setKams] = useState([]);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassigning, setReassigning] = useState(false);
+  const [reassignError, setReassignError] = useState('');
 
   useEffect(() => {
-    if (!isManager) return;
-    supabase.from('profiles').select('id, full_name, zone')
-      .eq('role', 'kam').eq('is_active', true).order('full_name')
+    supabase.from('profiles').select('id, full_name, zone, role')
+      .in('role', ['kam', 'coordinator', 'manager']).eq('is_active', true).order('full_name')
       .then(({ data }) => setKams(data || []));
-  }, [isManager]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -119,14 +117,20 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
   async function reassign(kam) {
     if (!kam || kam.id === channel.assigned_to) { setReassignOpen(false); return; }
     setReassigning(true);
+    setReassignError('');
     try {
-      const { error } = await supabase.from('channels').update({ assigned_to: kam.id }).eq('id', channel.id);
+      const { data, error } = await supabase.rpc('reassign_channel_open', {
+        target_channel_id: channel.id,
+        target_assignee_id: kam.id,
+      });
       if (error) throw error;
+      if (data !== channel.id) throw new Error('No se pudo completar la reasignación');
       setSummary(prev => ({ ...prev, responsible: kam.full_name, responsibleZone: kam.zone }));
       setReassignOpen(false);
       onReassigned?.(kam.id, kam);
     } catch (error) {
       console.error('Error reasignando canal:', error);
+      setReassignError('No se pudo cambiar el responsable. Inténtalo de nuevo.');
     } finally {
       setReassigning(false);
     }
@@ -209,18 +213,17 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
           <div className="truncate text-sm font-bold text-text-primary">{summary.responsible}</div>
           {summary.responsibleZone && <div className="mt-0.5 text-[10px] text-text-muted">Zona {summary.responsibleZone}</div>}
         </div>
-        {isManager && (
-          <button onClick={() => setReassignOpen(open => !open)} disabled={reassigning}
+        <button onClick={() => { setReassignOpen(open => !open); setReassignError(''); }} disabled={reassigning}
             title="Cambiar KAM responsable"
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 disabled:opacity-50">
             {reassigning ? <Loader2 size={14} className="animate-spin" />
               : reassignOpen ? <ChevronDown size={14} className="rotate-180" /> : <ArrowRightLeft size={14} />}
-          </button>
-        )}
+        </button>
 
-        {isManager && reassignOpen && (
+        {reassignOpen && (
           <div className="absolute right-2 top-[calc(100%+6px)] z-30 max-h-60 w-72 overflow-y-auto rounded-xl border border-surface-3 bg-white p-1.5 shadow-xl">
             <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted">Cambiar responsable</div>
+            {reassignError && <div className="mx-1 mb-1 rounded-lg bg-red-50 px-2 py-1.5 text-[10px] text-red-600">{reassignError}</div>}
             {kams.map(kam => {
               const current = kam.id === channel.assigned_to;
               return (
@@ -231,7 +234,9 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-xs font-semibold text-text-primary">{kam.full_name}</div>
-                    <div className="text-[9px] text-text-muted">Zona {kam.zone || '-'}</div>
+                    <div className="text-[9px] text-text-muted">
+                      {kam.role === 'kam' ? 'KAM' : 'Coordinación'} · Zona {kam.zone || '-'}
+                    </div>
                   </div>
                   {current && <Check size={13} className="text-teal-500" />}
                 </button>

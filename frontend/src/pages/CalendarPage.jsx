@@ -311,7 +311,7 @@ function EventCard({ event, onDelete, onComplete }) {
         <Icon size={12} style={{ color: cfg.color }} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm font-semibold truncate ${isCompleted ? 'line-through text-text-secondary' : ''}`}>
+        <div className={`text-sm font-semibold truncate ${isCompleted ? 'text-text-primary' : ''}`}>
           {event._channelName || 'Canal'}
         </div>
         <div className="text-[10px] text-text-muted truncate">
@@ -421,7 +421,7 @@ export default function CalendarPage() {
   const [selectedKam, setSelectedKam] = useState('all');
   const [teamKams, setTeamKams] = useState([]);
   const [viewMode, setViewMode] = useState('day');
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [onlyPending, setOnlyPending] = useState(false);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
@@ -699,7 +699,7 @@ setActivityChannelIds(ids);
     });
 
     return events
-      .filter(event => showCompleted || !event.is_completed)
+      .filter(event => !onlyPending || !event.is_completed)
       .sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
   }
 
@@ -773,9 +773,9 @@ const visibleChannels = channels.filter(ch => {
 
       <div className="flex justify-end">
         <label className="inline-flex items-center gap-2 text-[11px] text-text-secondary cursor-pointer select-none">
-          <input type="checkbox" checked={showCompleted} onChange={(e) => setShowCompleted(e.target.checked)}
+          <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)}
             className="w-3.5 h-3.5 accent-brand-500" />
-          Mostrar completadas
+          Solo pendientes
         </label>
       </div>
 

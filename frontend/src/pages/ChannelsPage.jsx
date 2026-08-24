@@ -8,6 +8,7 @@ import ChannelClassification from '../components/ChannelClassification';
 import ClassificationSelector from '../components/ClassificationSelector';
 import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
+import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
 import { ChannelReassign, BulkReassignModal } from '../components/ChannelReassign';
@@ -244,6 +245,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   useEffect(() => {
     loadChannel();
@@ -676,6 +678,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         )}
       </div>
 
+      <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} />
+
       <ChannelReassign channel={channel} onReassigned={(kamId) => {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
       }} />
@@ -689,11 +693,11 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       </div>
 
       <div className="mb-4">
-        <ActivityTimeline channel={channel} />
+        <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
 
       <div className="mb-4">
-        <MeetingMinutes channelId={channelId} />
+        <MeetingMinutes channelId={channelId} onChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
 
       <div className="mb-4">

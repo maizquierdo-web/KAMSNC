@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
 import { FileText, Plus, Trash2, Upload, X, Loader2, Calendar, Users, ChevronDown } from 'lucide-react';
 
-export default function MeetingMinutes({ channelId }) {
+export default function MeetingMinutes({ channelId, onChange }) {
   const { user } = useAuthContext();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +69,7 @@ export default function MeetingMinutes({ channelId }) {
       setFile(null);
       setShowForm(false);
       loadMeetings();
+      onChange?.();
     } catch (err) {
       setError(err.message || 'Error al guardar el acta');
     } finally {
@@ -88,6 +89,7 @@ export default function MeetingMinutes({ channelId }) {
       }
       await supabase.from('channel_meetings').delete().eq('id', meeting.id);
       loadMeetings();
+      onChange?.();
     } catch (err) {
       console.error('Error al eliminar:', err);
     }

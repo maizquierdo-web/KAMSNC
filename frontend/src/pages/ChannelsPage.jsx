@@ -10,6 +10,7 @@ import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelBusinessCasePrompt from '../components/ChannelBusinessCasePrompt';
+import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
@@ -695,6 +696,15 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
         ) || channel.channel_type?.trim().toLowerCase().includes('cae')
           || Boolean(channel.potencial_caes)} />
+
+      {channel.pipeline_stage === 'onboarding' && (
+        <ChannelOnboardingDetails channel={channel}
+          isCaes={classifications.some(classification =>
+            classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
+          ) || channel.channel_type?.trim().toLowerCase().includes('cae')
+            || Boolean(channel.potencial_caes)}
+          onUpdate={changes => setChannel(current => ({ ...current, ...changes }))} />
+      )}
 
       <div className="mb-4">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />

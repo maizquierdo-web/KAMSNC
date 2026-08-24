@@ -30,6 +30,7 @@ const RESULT_CONFIG = {
 
 const INTERACTION_TYPES = [
   { key: 'call', label: 'Llamada', icon: '📞' },
+  { key: 'visit', label: 'Visita', icon: '📍' },
   { key: 'email', label: 'Email', icon: '📧' },
   { key: 'whatsapp', label: 'WhatsApp', icon: '💬' },
   { key: 'meeting', label: 'Reunión', icon: '👥' },
@@ -93,6 +94,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
     interaction_type: 'call', direction: 'outbound', subject: '', notes: '',
     duration_minutes: '', result: '', contact_person: '',
     planned_date: '', planned_time: '09:00',
+    next_action_type: 'call', next_action_date: '', next_action_time: '09:00', next_action_notes: '',
   });
   const [savingForm, setSavingForm] = useState(false);
 
@@ -174,6 +176,20 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
       }
       const { error } = await supabase.from('channel_interactions').insert(record);
       if (error) throw error;
+      if (!isPlanned && newForm.next_action_date) {
+        const { error: nextActionError } = await supabase.from('channel_interactions').insert({
+          channel_id: channel.id,
+          user_id: user.id,
+          interaction_type: newForm.next_action_type,
+          direction: 'outbound',
+          notes: newForm.next_action_notes || null,
+          contact_person: newForm.contact_person || null,
+          planned_date: newForm.next_action_date,
+          planned_time: newForm.next_action_time ? `${newForm.next_action_time}:00` : null,
+          is_completed: false,
+        });
+        if (nextActionError) throw nextActionError;
+      }
       resetForm();
       loadAll();
       onActivityChange?.();
@@ -221,7 +237,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
 
   function resetForm() {
     setFormMode(null);
-    setNewForm({ interaction_type: 'call', direction: 'outbound', subject: '', notes: '', duration_minutes: '', result: '', contact_person: channel?.contact_name || '', planned_date: '', planned_time: '09:00' });
+    setNewForm({ interaction_type: 'call', direction: 'outbound', subject: '', notes: '', duration_minutes: '', result: '', contact_person: channel?.contact_name || '', planned_date: '', planned_time: '09:00', next_action_type: 'call', next_action_date: '', next_action_time: '09:00', next_action_notes: '' });
   }
 
   const filters = [
@@ -269,6 +285,31 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
               <Calendar size={12} /> Planificar
             </button>
           </div>
+        </div>
+
+        {/* Primary work actions */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          {[
+            { key: 'call', label: 'Registrar llamada', Icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
+            { key: 'meeting', label: 'Registrar reunión', Icon: Users, color: '#E87A1E', bg: '#FEF3E8' },
+            { key: 'visit', label: 'Registrar visita', Icon: MapPin, color: '#16a34a', bg: '#f0fdf4' },
+          ].map(({ key, label, Icon, color, bg }) => (
+            <button key={key} onClick={() => {
+              setNewForm(p => ({ ...p, interaction_type: key }));
+              setFormMode('register');
+              setShowAddMenu(false);
+            }} className="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-bold transition-transform hover:-translate-y-0.5"
+              style={{ color, background: bg, border: `1px solid ${color}30` }}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+          <button onClick={() => {
+            setNewForm(p => ({ ...p, interaction_type: 'call' }));
+            setFormMode('plan');
+            setShowAddMenu(false);
+          }} className="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-bold text-white bg-brand-500 hover:bg-brand-600 transition-transform hover:-translate-y-0.5">
+            <Calendar size={14} /> Añadir seguimiento
+          </button>
         </div>
 
         {/* Quick actions */}
@@ -391,6 +432,32 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
               placeholder={formMode === 'plan' ? '¿Qué quieres conseguir con esta acción?' : 'Resumen, acuerdos, próximos pasos...'}
               className={`${inputClass} resize-none`} />
           </div>
+          {formMode === 'register' && (
+            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+              <div>
+                <div className="text-[10px] font-bold text-blue-700">Siguiente acción</div>
+                <div className="text-[9px] text-blue-500">Opcional. Si la completas, quedará directamente en la agenda.</div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[9px] font-bold text-text-muted uppercase mb-1">Tipo</label>
+                  <select value={newForm.next_action_type} onChange={(e) => setNewForm(p => ({ ...p, next_action_type: e.target.value }))} className={inputClass}>
+                    {INTERACTION_TYPES.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-text-muted uppercase mb-1">Fecha</label>
+                  <input type="date" value={newForm.next_action_date} onChange={(e) => setNewForm(p => ({ ...p, next_action_date: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-text-muted uppercase mb-1">Hora</label>
+                  <input type="time" value={newForm.next_action_time} onChange={(e) => setNewForm(p => ({ ...p, next_action_time: e.target.value }))} className={inputClass} />
+                </div>
+              </div>
+              <input type="text" value={newForm.next_action_notes} onChange={(e) => setNewForm(p => ({ ...p, next_action_notes: e.target.value }))}
+                placeholder="Qué hay que hacer después" className={inputClass} />
+            </div>
+          )}
           <button onClick={() => saveInteraction(formMode === 'plan')}
             disabled={savingForm || (formMode === 'plan' && !newForm.planned_date)}
             className={`w-full py-2.5 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${

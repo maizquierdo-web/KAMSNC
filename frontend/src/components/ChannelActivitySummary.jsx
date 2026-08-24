@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { useAuthContext } from './AuthProvider';
+import {
+  ArrowRightLeft, CalendarDays, Check, ChevronDown, Clock3, Loader2, TrendingUp,
+} from 'lucide-react';
 
 const TYPE_LABELS = {
   call: 'Llamar', email: 'Enviar email', whatsapp: 'WhatsApp', meeting: 'Reunión',
@@ -41,9 +44,20 @@ function nextByDate(items) {
   return items.filter(item => item.date).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
 }
 
-export default function ChannelActivitySummary({ channel, refreshKey = 0 }) {
+export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned }) {
+  const { isManager } = useAuthContext();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [kams, setKams] = useState([]);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+
+  useEffect(() => {
+    if (!isManager) return;
+    supabase.from('profiles').select('id, full_name, zone')
+      .eq('role', 'kam').eq('is_active', true).order('full_name')
+      .then(({ data }) => setKams(data || []));
+  }, [isManager]);
 
   useEffect(() => {
     let active = true;
@@ -60,7 +74,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0 }) {
           .eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(50),
         supabase.from('planned_visits').select('planned_date, planned_time, notes, is_completed')
           .eq('channel_id', channel.id).eq('is_completed', false).order('planned_date', { ascending: true }).limit(50),
-        supabase.from('profiles').select('full_name').eq('id', channel.assigned_to).maybeSingle(),
+        supabase.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
       ]);
 
       if (!active) return;
@@ -89,13 +103,34 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0 }) {
         })),
       ]);
 
-      setSummary({ latestActivity, nextAction, responsible: profileRes.data?.full_name || 'Sin asignar' });
+      setSummary({
+        latestActivity,
+        nextAction,
+        responsible: profileRes.data?.full_name || 'Sin asignar',
+        responsibleZone: profileRes.data?.zone,
+      });
       setLoading(false);
     }
 
     loadSummary();
     return () => { active = false; };
   }, [channel.id, channel.assigned_to, refreshKey]);
+
+  async function reassign(kam) {
+    if (!kam || kam.id === channel.assigned_to) { setReassignOpen(false); return; }
+    setReassigning(true);
+    try {
+      const { error } = await supabase.from('channels').update({ assigned_to: kam.id }).eq('id', channel.id);
+      if (error) throw error;
+      setSummary(prev => ({ ...prev, responsible: kam.full_name, responsibleZone: kam.zone }));
+      setReassignOpen(false);
+      onReassigned?.(kam.id, kam);
+    } catch (error) {
+      console.error('Error reasignando canal:', error);
+    } finally {
+      setReassigning(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -107,39 +142,104 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0 }) {
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const cards = [
-    {
-      label: 'Última actividad',
-      value: summary.latestActivity
-        ? `${formatRelativeDate(summary.latestActivity.date)} · ${summary.latestActivity.label}` : 'Sin actividad',
-    },
-    {
-      label: 'Siguiente acción',
-      value: summary.nextAction
-        ? `${formatActionDate(summary.nextAction.date)} · ${summary.nextAction.label}` : 'Sin siguiente acción',
-      detail: summary.nextAction?.detail,
-      alert: summary.nextAction && new Date(`${summary.nextAction.date}T00:00:00`) < todayStart,
-    },
-    {
-      label: 'Potencial',
-      value: channel.potencial_caes || channel.potencial_energia || 'Sin valorar',
-      detail: channel.potencial_caes && channel.potencial_energia
-        ? `CAEs: ${channel.potencial_caes} · Energía: ${channel.potencial_energia}`
-        : channel.potencial_caes ? 'CAEs' : channel.potencial_energia ? 'Energía' : null,
-    },
-    { label: 'Responsable', value: summary.responsible },
-  ];
+  const nextActionAlert = summary.nextAction
+    && new Date(`${summary.nextAction.date}T00:00:00`) < todayStart;
+  const potential = channel.potencial_caes || channel.potencial_energia || 'Sin valorar';
+  const potentialStyle = {
+    Bajo: 'border-slate-200 bg-slate-50 text-slate-600',
+    Medio: 'border-amber-300 bg-amber-50 text-amber-600',
+    Alto: 'border-green-300 bg-green-50 text-green-600',
+    'Muy Alto': 'border-teal-300 bg-teal-50 text-teal-600',
+  }[potential] || 'border-slate-200 bg-slate-50 text-slate-600';
 
   return (
-    <div className="mb-4 grid grid-cols-2 overflow-hidden rounded-xl border border-surface-3 bg-surface-1 lg:grid-cols-4">
-      {cards.map((card, index) => (
-        <div key={card.label}
-          className={`min-w-0 p-3.5 ${index % 2 === 0 ? 'border-r border-surface-3' : ''} ${index < 2 ? 'border-b border-surface-3 lg:border-b-0' : ''} ${index > 0 ? 'lg:border-l lg:border-surface-3' : ''} lg:border-r-0`}>
-          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">{card.label}</div>
-          <div className={`truncate text-xs font-bold ${card.alert ? 'text-red-500' : 'text-text-primary'}`}>{card.value}</div>
-          {card.detail && <div className="mt-1 truncate text-[10px] text-text-muted" title={card.detail}>{card.detail}</div>}
+    <div className="mb-4 grid grid-cols-2 overflow-visible rounded-xl border border-surface-3 bg-white lg:grid-cols-4">
+      <div className="flex min-w-0 items-center gap-3 border-b border-r border-surface-3 bg-blue-50/40 p-3.5 lg:border-b-0">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+          <Clock3 size={20} />
         </div>
-      ))}
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Última actividad</div>
+          <div className="truncate text-sm font-bold text-slate-700">
+            {summary.latestActivity
+              ? `${formatRelativeDate(summary.latestActivity.date)} · ${summary.latestActivity.label}` : 'Sin actividad'}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-3 border-b border-surface-3 bg-orange-50/40 p-3.5 lg:border-b-0 lg:border-r">
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
+          <CalendarDays size={20} />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Siguiente acción</div>
+          <div className={`truncate text-sm font-bold ${nextActionAlert ? 'text-red-500' : 'text-orange-500'}`}>
+            {summary.nextAction
+              ? `${formatActionDate(summary.nextAction.date)} · ${summary.nextAction.label}` : 'Sin siguiente acción'}
+          </div>
+          {summary.nextAction?.detail && (
+            <div className="mt-1 truncate text-[10px] text-text-muted" title={summary.nextAction.detail}>
+              {summary.nextAction.detail}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex min-w-0 items-center gap-3 border-r border-surface-3 bg-amber-50/40 p-3.5">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-500">
+          <TrendingUp size={20} />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Potencial</div>
+          <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${potentialStyle}`}>{potential}</span>
+          <div className="mt-1 truncate text-[10px] text-text-muted">
+            {channel.potencial_caes && channel.potencial_energia
+              ? `CAEs: ${channel.potencial_caes} · Energía: ${channel.potencial_energia}`
+              : channel.potencial_caes ? 'CAEs' : channel.potencial_energia ? 'Energía' : 'Pendiente de valorar'}
+          </div>
+        </div>
+      </div>
+
+      <div className="relative flex min-w-0 items-center gap-3 bg-teal-50/40 p-3.5">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-teal-500 text-sm font-bold text-white">
+          {summary.responsible?.charAt(0) || '?'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Responsable</div>
+          <div className="truncate text-sm font-bold text-text-primary">{summary.responsible}</div>
+          {summary.responsibleZone && <div className="mt-0.5 text-[10px] text-text-muted">Zona {summary.responsibleZone}</div>}
+        </div>
+        {isManager && (
+          <button onClick={() => setReassignOpen(open => !open)} disabled={reassigning}
+            title="Cambiar KAM responsable"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 disabled:opacity-50">
+            {reassigning ? <Loader2 size={14} className="animate-spin" />
+              : reassignOpen ? <ChevronDown size={14} className="rotate-180" /> : <ArrowRightLeft size={14} />}
+          </button>
+        )}
+
+        {isManager && reassignOpen && (
+          <div className="absolute right-2 top-[calc(100%+6px)] z-30 max-h-60 w-72 overflow-y-auto rounded-xl border border-surface-3 bg-white p-1.5 shadow-xl">
+            <div className="px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-text-muted">Cambiar responsable</div>
+            {kams.map(kam => {
+              const current = kam.id === channel.assigned_to;
+              return (
+                <button key={kam.id} onClick={() => reassign(kam)}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${current ? 'bg-teal-50' : 'hover:bg-surface-1'}`}>
+                  <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${current ? 'bg-teal-500' : 'bg-blue-600'}`}>
+                    {kam.full_name?.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-semibold text-text-primary">{kam.full_name}</div>
+                    <div className="text-[9px] text-text-muted">Zona {kam.zone || '-'}</div>
+                  </div>
+                  {current && <Check size={13} className="text-teal-500" />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

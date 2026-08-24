@@ -486,6 +486,63 @@ function KamSelector({ kams, selected, onChange }) {
   );
 }
 
+function SummaryKamMultiSelect({ kams, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handleClick(event) {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const selectedNames = kams.filter(kam => selected.includes(kam.id)).map(kam => kam.full_name);
+  const label = selected.length === 0
+    ? 'Todo el equipo'
+    : selected.length === 1
+      ? selectedNames[0]
+      : `${selected.length} KAMs seleccionados`;
+
+  function toggle(id) {
+    onChange(selected.includes(id) ? selected.filter(item => item !== id) : [...selected, id]);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(!open)}
+        className="h-9 min-w-44 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary flex items-center justify-between gap-2">
+        <span className="truncate">{label}</span><ChevronDown size={13} className="text-text-muted flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-64 max-h-72 overflow-y-auto rounded-xl border border-surface-3 bg-white shadow-xl z-30 p-1.5">
+          <button type="button" onClick={() => onChange([])}
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-surface-1 text-left">
+            <span className={`w-4 h-4 rounded border flex items-center justify-center ${selected.length === 0 ? 'bg-brand-500 border-brand-500 text-white' : 'border-surface-4'}`}>
+              {selected.length === 0 && <Check size={11} />}
+            </span>
+            <span className="text-xs font-semibold">Todo el equipo</span>
+          </button>
+          <div className="h-px bg-surface-3 my-1" />
+          {kams.map(kam => {
+            const checked = selected.includes(kam.id);
+            return (
+              <button key={kam.id} type="button" onClick={() => toggle(kam.id)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-surface-1 text-left">
+                <span className={`w-4 h-4 rounded border flex items-center justify-center ${checked ? 'bg-brand-500 border-brand-500 text-white' : 'border-surface-4'}`}>
+                  {checked && <Check size={11} />}
+                </span>
+                <span className="text-xs text-text-primary truncate">{kam.full_name}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============ MAIN CALENDAR PAGE ============
 export default function CalendarPage() {
   const { user, profile, isManager } = useAuthContext();
@@ -513,6 +570,7 @@ export default function CalendarPage() {
   const [summaryTo, setSummaryTo] = useState('');
   const [summaryRows, setSummaryRows] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryKamIds, setSummaryKamIds] = useState([]);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
@@ -520,7 +578,7 @@ export default function CalendarPage() {
   useEffect(() => { if (user) { loadWeekData(); loadChannels(); if (isManager) loadTeamKams(); } }, [user, currentWeekStart, selectedKam]);
   useEffect(() => {
     if (user) loadActivitySummary();
-  }, [user, selectedKam, summaryPeriod, summaryFrom, summaryTo, currentWeekStart, teamKams.length]);
+  }, [user, summaryKamIds.join(','), summaryPeriod, summaryFrom, summaryTo, currentWeekStart, teamKams.length]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
 
   async function loadTeamKams() {
@@ -559,9 +617,9 @@ export default function CalendarPage() {
         actionsQuery = actionsQuery.gte('planned_date', from).lt('planned_date', to);
       }
 
-      if (selectedKam !== 'all') {
-        visitsQuery = visitsQuery.eq('kam_id', selectedKam);
-        actionsQuery = actionsQuery.eq('user_id', selectedKam);
+      if (isManager && summaryKamIds.length > 0) {
+        visitsQuery = visitsQuery.in('kam_id', summaryKamIds);
+        actionsQuery = actionsQuery.in('user_id', summaryKamIds);
       } else if (!isManager) {
         visitsQuery = visitsQuery.eq('kam_id', user.id);
         actionsQuery = actionsQuery.eq('user_id', user.id);
@@ -580,10 +638,11 @@ export default function CalendarPage() {
         return rows.get(id);
       };
 
-      if (isManager && selectedKam === 'all') {
-        teamKams.forEach(kam => ensureRow(kam.id, kam.full_name));
+      if (isManager) {
+        teamKams.filter(kam => summaryKamIds.length === 0 || summaryKamIds.includes(kam.id))
+          .forEach(kam => ensureRow(kam.id, kam.full_name));
       } else {
-        const targetId = selectedKam !== 'all' ? selectedKam : user.id;
+        const targetId = user.id;
         const target = teamKams.find(kam => kam.id === targetId);
         ensureRow(targetId, target?.full_name || profile?.full_name);
       }
@@ -1146,18 +1205,23 @@ const visibleChannels = channels.filter(ch => {
             <div>
               <h3 className="text-sm font-bold text-text-primary">Resumen de actividad</h3>
               <p className="text-[10px] text-text-muted">
-                {isManager && selectedKam === 'all' ? 'Visión automática de todo el equipo' : 'Actividad del KAM seleccionado'}
+                {isManager && summaryKamIds.length === 0 ? 'Visión automática de todo el equipo' : isManager ? 'Actividad de los KAMs seleccionados' : 'Tu actividad registrada'}
               </p>
             </div>
-            <select value={summaryPeriod} onChange={(e) => setSummaryPeriod(e.target.value)}
-              className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
-              <option value="week">Semana seleccionada</option>
-              <option value="month">Mes actual</option>
-              <option value="quarter">Trimestre actual</option>
-              <option value="year">Año actual</option>
-              <option value="all">Acumulado</option>
-              <option value="custom">Periodo personalizado</option>
-            </select>
+            <div className="flex flex-col sm:flex-row gap-2">
+              {isManager && (
+                <SummaryKamMultiSelect kams={teamKams} selected={summaryKamIds} onChange={setSummaryKamIds} />
+              )}
+              <select value={summaryPeriod} onChange={(e) => setSummaryPeriod(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
+                <option value="week">Semana seleccionada</option>
+                <option value="month">Mes actual</option>
+                <option value="quarter">Trimestre actual</option>
+                <option value="year">Año actual</option>
+                <option value="all">Acumulado</option>
+                <option value="custom">Periodo personalizado</option>
+              </select>
+            </div>
           </div>
 
           {summaryPeriod === 'custom' && (

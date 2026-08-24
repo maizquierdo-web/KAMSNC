@@ -10,6 +10,7 @@ import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelAttentionAlerts from '../components/ChannelAttentionAlerts';
+import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
 import { BulkReassignModal } from '../components/ChannelReassign';
@@ -24,7 +25,7 @@ import {
 } from '../lib/crmConstants';
 import {
   Search, Plus, Building2, Phone, Mail, MapPin,
-  ChevronRight, User, X, Check, Loader2, Edit3, Upload, ArrowRightLeft
+  ChevronRight, User, X, Check, Loader2, Edit3, Upload, ArrowRightLeft, Sparkles
 } from 'lucide-react';
 
 // ============ MULTISELECT ORIGEN DEL LEAD (checkboxes) ============
@@ -247,6 +248,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   useEffect(() => {
     loadChannel();
@@ -563,6 +565,10 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   </span>
                 </div>
               </div>
+              <button onClick={() => setCopilotOpen(true)}
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-[#12304a] px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-[#19405f]">
+                <Sparkles size={14} /> Analizar con IA
+              </button>
               <button onClick={startEdit}
                 className="p-2 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-primary transition-colors flex-shrink-0">
                 <Edit3 size={16} />
@@ -716,6 +722,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       <div className="mb-4">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
       </div>
+
+      <ChannelCopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} channel={channel} />
     </div>
   );
 }

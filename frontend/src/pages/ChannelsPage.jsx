@@ -9,8 +9,6 @@ import ClassificationSelector from '../components/ClassificationSelector';
 import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
-import ChannelAttentionAlerts from '../components/ChannelAttentionAlerts';
-import ChannelWorkFocus from '../components/ChannelWorkFocus';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
@@ -690,14 +688,6 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
       }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
-
-      <ChannelWorkFocus channelId={channelId} refreshKey={activityRefreshKey} />
-
-      <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey}
-        isCaes={classifications.some(classification =>
-          classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
-        ) || channel.channel_type?.trim().toLowerCase().includes('cae')
-          || Boolean(channel.potencial_caes)} />
 
       <div className="mb-4">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />

@@ -16,6 +16,14 @@ const TYPE_CONFIG = {
   other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: 'bg-gray-50' },
 };
 
+const ONBOARDING_LABELS = {
+  documentation_requested: 'Documentación solicitada',
+  sauc_opening: 'Apertura de SAUC',
+  delayed_by_channel: 'Demorado por el canal',
+  order_contract_activated: 'Pedido y contrato activados',
+  user_created: 'Alta de usuario',
+};
+
 function dateKey(date = new Date()) {
   const pad = value => String(value).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -49,6 +57,7 @@ export default function HomePage() {
   const [stats, setStats] = useState({ today: 0, withoutNext: 0, inactive: 0, overdue: 0 });
   const [detailGroups, setDetailGroups] = useState({ today: [], withoutNext: [], inactive: [], overdue: [] });
   const [selectedDetail, setSelectedDetail] = useState(null);
+  const [onboardingWarnings, setOnboardingWarnings] = useState([]);
   const mountedRef = useRef(true);
   const openChannel = id => { if (id) navigate(`/channels?detail=${id}`); };
 
@@ -59,12 +68,21 @@ export default function HomePage() {
       const today = dateKey();
       const [feedRes, channelsRes, alertsRes] = await Promise.all([
         supabase.from('channel_activity_feed').select('*').eq('user_id', user.id).order('scheduled_date').order('scheduled_time'),
-        supabase.from('channels').select('id, name, pipeline_stage, status, updated_at').eq('assigned_to', user.id),
+        supabase.from('channels').select('id, name, pipeline_stage, status, updated_at, pipeline_stage_changed_at, onboarding_status, onboarding_status_changed_at').eq('assigned_to', user.id),
         supabase.from('alerts').select('id, channel_id, title, detail, priority, due_date').eq('user_id', user.id).eq('is_dismissed', false).order('created_at', { ascending: false }).limit(10),
       ]);
       if (feedRes.error) throw feedRes.error;
       if (channelsRes.error) throw channelsRes.error;
       const feed = feedRes.data || []; const channels = channelsRes.data || [];
+      const onboarding = channels
+        .filter(channel => channel.pipeline_stage === 'onboarding')
+        .map(channel => ({
+          id: channel.id,
+          name: channel.name,
+          status: ONBOARDING_LABELS[channel.onboarding_status] || 'Documentación solicitada',
+          days: daysSince(channel.onboarding_status_changed_at || channel.pipeline_stage_changed_at || channel.updated_at) || 0,
+        }))
+        .sort((a, b) => b.days - a.days);
       const ids = [...new Set(feed.map(item => item.channel_id).filter(Boolean))];
       const detailsRes = ids.length ? await supabase.from('channels').select('id, name, address').in('id', ids) : { data: [], error: null };
       if (detailsRes.error) throw detailsRes.error;
@@ -95,6 +113,7 @@ export default function HomePage() {
       if (!mountedRef.current) return;
       setTodayActions(pendingToday); setCompletedToday(todayRows.filter(item => item.status === 'completed').length);
       setAttentionItems(attention.slice(0, 12));
+      setOnboardingWarnings(onboarding);
       setStats({ today: todayRows.length, withoutNext: withoutNext.length, inactive: inactive.length, overdue: overdue.length });
       setDetailGroups({
         today: todayRows.map(item => ({ id: item.activity_key, channelId: item.channel_id, channelName: channelMap.get(item.channel_id)?.name || 'Canal', title: TYPE_CONFIG[item.activity_type]?.label || 'Acción', detail: `${item.scheduled_time?.slice(0, 5) || '--:--'} · ${item.status === 'completed' ? 'Completada' : item.status === 'in_progress' ? 'En curso' : 'Pendiente'}` })),
@@ -142,6 +161,19 @@ export default function HomePage() {
         <SummaryCard value={stats.overdue} label="Acciones vencidas" detail="Requieren atención" tone="red" icon={CircleAlert} onClick={() => setSelectedDetail('overdue')} />
       </div>
     </section>
+    {onboardingWarnings.length > 0 && <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/35">
+      <div className="flex items-center justify-between border-b border-cyan-100 px-4 py-3">
+        <div><h2 className="text-sm font-bold text-text-primary">Seguimiento de altas</h2><p className="text-[10px] text-text-muted">Días transcurridos desde el último cambio de evolución</p></div>
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-cyan-100 px-2 text-xs font-bold text-cyan-700">{onboardingWarnings.length}</span>
+      </div>
+      <div className="divide-y divide-cyan-100">
+        {onboardingWarnings.slice(0, 5).map(item => <button key={item.id} onClick={() => openChannel(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-cyan-50">
+          <span className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-xs font-extrabold ${item.days > 10 ? 'bg-red-50 text-red-600' : item.days > 5 ? 'bg-amber-50 text-amber-700' : 'bg-white text-cyan-700'}`}>{item.days}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{item.name}</span><span className="block truncate text-[10px] text-text-secondary">{item.status} · {item.days === 0 ? 'actualizado hoy' : `${item.days} ${item.days === 1 ? 'día' : 'días'} sin evolución`}</span></span>
+          <ArrowRight size={14} className="text-cyan-600" />
+        </button>)}
+      </div>
+    </section>}
     <CheckInButton />
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
       <section className="rounded-2xl border border-surface-3 bg-surface-1 overflow-hidden">

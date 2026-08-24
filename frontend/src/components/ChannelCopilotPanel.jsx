@@ -169,41 +169,41 @@ ${contextOverride}`,
 
   return (
     <>
-      <button aria-label="Cerrar copiloto" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[1px]" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-slate-700 bg-[#102433] text-white shadow-2xl sm:w-[440px]">
-        <div className="flex items-start justify-between border-b border-white/10 px-4 py-4">
+      <button aria-label="Cerrar copiloto" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/15 lg:hidden" />
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[440px] lg:sticky lg:top-4 lg:z-0 lg:h-[calc(100vh-120px)] lg:w-full lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-sm">
+        <div className="flex items-start justify-between border-b border-blue-100 bg-[#eaf4f8] px-4 py-4">
           <div className="flex gap-2.5">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-teal-400/15 text-teal-300"><Sparkles size={18} /></div>
-            <div><h2 className="text-base font-extrabold">Copiloto del canal</h2><p className="mt-0.5 text-[10px] text-slate-300">Contexto: {channel.name}</p></div>
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-600"><Sparkles size={18} /></div>
+            <div><h2 className="text-base font-extrabold text-slate-800">Copiloto del canal</h2><p className="mt-0.5 text-[10px] text-slate-500">Contexto: {channel.name}</p></div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white"><X size={18} /></button>
+          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"><X size={18} /></button>
         </div>
 
-        <div className="border-b border-white/10 px-4 py-3">
-          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-teal-300"><span className="h-1.5 w-1.5 rounded-full bg-teal-300" /> Contexto cargado</div>
+        <div className="border-b border-surface-3 bg-white px-4 py-3">
+          <div className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-teal-600"><span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> Contexto cargado</div>
           <div className="flex flex-wrap gap-1.5">
-            <span className="rounded-md border border-white/15 px-2 py-1 text-[9px] text-slate-200">Ficha del canal</span>
-            <span className="rounded-md border border-white/15 px-2 py-1 text-[9px] text-slate-200">{contextStats.activities} actividades</span>
-            <span className="rounded-md border border-white/15 px-2 py-1 text-[9px] text-slate-200">{contextStats.meetings} reuniones</span>
-            <span className="rounded-md border border-white/15 px-2 py-1 text-[9px] text-slate-200">{contextStats.documents} documentos</span>
+            <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">Ficha del canal</span>
+            <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">{contextStats.activities} actividades</span>
+            <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">{contextStats.meetings} reuniones</span>
+            <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">{contextStats.documents} documentos</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {loadingContext && !initialSummary ? (
-            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-slate-300"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
+            <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-white p-4 text-xs text-slate-500"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
           ) : initialSummary && (
-            <div className="mb-4 rounded-xl border border-teal-300/20 bg-white/5 p-3.5">
-              <div className="mb-1.5 text-xs font-bold text-teal-200">Resumen de {channel.name}</div>
-              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-100">{initialSummary.text}</p>
+            <div className="mb-4 rounded-xl border border-blue-100 bg-white p-3.5 shadow-sm">
+              <div className="mb-1.5 text-xs font-bold text-teal-700">Resumen de {channel.name}</div>
+              <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{initialSummary.text}</p>
             </div>
           )}
 
           <div className="mb-4 space-y-1.5">
             {SUGGESTIONS.map(suggestion => (
               <button key={suggestion} onClick={() => askCopilot(suggestion)} disabled={loadingContext || loading}
-                className="flex w-full items-center justify-between rounded-lg border border-white/15 bg-white/[0.03] px-3 py-2.5 text-left text-[11px] text-slate-100 transition-colors hover:bg-white/10 disabled:opacity-40">
-                {suggestion}<MessageSquareText size={12} className="text-teal-300" />
+                className="flex w-full items-center justify-between rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-left text-[11px] text-slate-600 transition-colors hover:border-teal-200 hover:bg-teal-50/40 disabled:opacity-40">
+                {suggestion}<MessageSquareText size={12} className="text-teal-500" />
               </button>
             ))}
           </div>
@@ -211,23 +211,23 @@ ${contextOverride}`,
           <div className="space-y-3">
             {conversation.map((message, index) => (
               <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[88%] whitespace-pre-wrap rounded-xl px-3 py-2.5 text-xs leading-relaxed ${message.role === 'user' ? 'bg-teal-500 text-white' : 'border border-white/10 bg-white/5 text-slate-100'}`}>{message.text}</div>
+                <div className={`max-w-[88%] whitespace-pre-wrap rounded-xl px-3 py-2.5 text-xs leading-relaxed ${message.role === 'user' ? 'bg-teal-500 text-white' : 'border border-surface-3 bg-white text-slate-700'}`}>{message.text}</div>
               </div>
             ))}
-            {loading && <div className="flex items-center gap-2 text-xs text-slate-300"><Loader2 size={14} className="animate-spin" /> Pensando…</div>}
-            {error && <div className="rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-200">{error}</div>}
+            {loading && <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 size={14} className="animate-spin" /> Pensando…</div>}
+            {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{error}</div>}
             <div ref={endRef} />
           </div>
         </div>
 
-        <div className="border-t border-white/10 bg-[#0d1e2b] p-3">
-          <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-1.5">
+        <div className="border-t border-surface-3 bg-white p-3">
+          <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-teal-300">
             <FileText size={15} className="ml-2 flex-shrink-0 text-slate-400" />
             <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askCopilot(input); }}
               disabled={loadingContext || loading} placeholder="Pregunta sobre este canal…"
-              className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-white placeholder:text-slate-400 focus:outline-none disabled:opacity-50" />
+              className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-50" />
             <button onClick={() => askCopilot(input)} disabled={!input.trim() || loadingContext || loading}
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-teal-400 text-[#102433] hover:bg-teal-300 disabled:opacity-30"><ArrowUp size={16} /></button>
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-30"><ArrowUp size={16} /></button>
           </div>
         </div>
       </aside>

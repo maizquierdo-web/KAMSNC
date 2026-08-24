@@ -395,7 +395,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const pipeline = PIPELINE_CONFIG[channel.pipeline_stage] || '-';
 
   return (
-    <div>
+    <div className={`grid items-start gap-4 ${copilotOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'}`}>
+      <div className="min-w-0">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-brand-400 font-semibold mb-4">
         ← Canales
       </button>
@@ -721,6 +722,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
 
       <div className="mb-4">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
+      </div>
       </div>
 
       <ChannelCopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} channel={channel} />

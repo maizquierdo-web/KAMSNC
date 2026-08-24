@@ -43,6 +43,23 @@ function getPeriodRange(periodKey, customFrom, customTo) {
   }
   return getDateRange(periodKey);
 }
+
+function getSummaryPeriodRange(period, weekStart, customFrom, customTo) {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  if (period === 'week') return { start: new Date(weekStart), end: addDays(weekStart, 7) };
+  if (period === 'month') return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 1) };
+  if (period === 'quarter') {
+    const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+    return { start: new Date(now.getFullYear(), quarterMonth, 1), end: new Date(now.getFullYear(), quarterMonth + 3, 1) };
+  }
+  if (period === 'year') return { start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear() + 1, 0, 1) };
+  if (period === 'custom') {
+    if (!customFrom || !customTo) return null;
+    return { start: new Date(`${customFrom}T00:00:00`), end: addDays(new Date(`${customTo}T00:00:00`), 1) };
+  }
+  return { start: null, end: null };
+}
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const TYPE_CONFIG = {
@@ -491,11 +508,19 @@ export default function CalendarPage() {
   const [teamKams, setTeamKams] = useState([]);
   const [viewMode, setViewMode] = useState('day');
   const [onlyPending, setOnlyPending] = useState(false);
+  const [summaryPeriod, setSummaryPeriod] = useState('week');
+  const [summaryFrom, setSummaryFrom] = useState('');
+  const [summaryTo, setSummaryTo] = useState('');
+  const [summaryRows, setSummaryRows] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
   useEffect(() => { if (user) { loadWeekData(); loadChannels(); if (isManager) loadTeamKams(); } }, [user, currentWeekStart, selectedKam]);
+  useEffect(() => {
+    if (user) loadActivitySummary();
+  }, [user, selectedKam, summaryPeriod, summaryFrom, summaryTo, currentWeekStart, teamKams.length]);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
 
   async function loadTeamKams() {
@@ -513,6 +538,79 @@ export default function CalendarPage() {
     if (!isManager) query = query.eq('assigned_to', user.id);
     const { data } = await query;
     setChannels(data || []);
+  }
+
+  async function loadActivitySummary() {
+    const range = getSummaryPeriodRange(summaryPeriod, currentWeekStart, summaryFrom, summaryTo);
+    if (!range) {
+      setSummaryRows([]);
+      return;
+    }
+    setSummaryLoading(true);
+    try {
+      let visitsQuery = supabase.from('planned_visits').select('kam_id, planned_date, is_completed');
+      let actionsQuery = supabase.from('channel_interactions')
+        .select('user_id, interaction_type, planned_date, is_completed').not('planned_date', 'is', null);
+
+      if (range.start && range.end) {
+        const from = formatDateKey(range.start);
+        const to = formatDateKey(range.end);
+        visitsQuery = visitsQuery.gte('planned_date', from).lt('planned_date', to);
+        actionsQuery = actionsQuery.gte('planned_date', from).lt('planned_date', to);
+      }
+
+      if (selectedKam !== 'all') {
+        visitsQuery = visitsQuery.eq('kam_id', selectedKam);
+        actionsQuery = actionsQuery.eq('user_id', selectedKam);
+      } else if (!isManager) {
+        visitsQuery = visitsQuery.eq('kam_id', user.id);
+        actionsQuery = actionsQuery.eq('user_id', user.id);
+      }
+
+      const [visitsRes, actionsRes] = await Promise.all([visitsQuery, actionsQuery]);
+      if (visitsRes.error) throw visitsRes.error;
+      if (actionsRes.error) throw actionsRes.error;
+
+      const rows = new Map();
+      const ensureRow = (id, name) => {
+        if (!rows.has(id)) rows.set(id, {
+          id, name: name || 'KAM', planned: 0, completed: 0, pending: 0, overdue: 0,
+          types: { visit: 0, call: 0, meeting: 0, email: 0, whatsapp: 0, linkedin: 0, other: 0 },
+        });
+        return rows.get(id);
+      };
+
+      if (isManager && selectedKam === 'all') {
+        teamKams.forEach(kam => ensureRow(kam.id, kam.full_name));
+      } else {
+        const targetId = selectedKam !== 'all' ? selectedKam : user.id;
+        const target = teamKams.find(kam => kam.id === targetId);
+        ensureRow(targetId, target?.full_name || profile?.full_name);
+      }
+
+      const todayKey = formatDateKey(new Date());
+      const register = (id, type, plannedDate, completed) => {
+        const kam = teamKams.find(item => item.id === id);
+        const row = ensureRow(id, kam?.full_name || (id === user.id ? profile?.full_name : 'KAM'));
+        row.planned += 1;
+        row.types[type] = (row.types[type] || 0) + 1;
+        if (completed === true) row.completed += 1;
+        else {
+          row.pending += 1;
+          if (plannedDate < todayKey) row.overdue += 1;
+        }
+      };
+
+      (visitsRes.data || []).forEach(item => register(item.kam_id, 'visit', item.planned_date, item.is_completed));
+      (actionsRes.data || []).forEach(item => register(item.user_id, item.interaction_type || 'other', item.planned_date, item.is_completed));
+
+      setSummaryRows([...rows.values()].sort((a, b) => a.name.localeCompare(b.name, 'es')));
+    } catch (err) {
+      console.error('Error cargando resumen de actividad:', err);
+      setSummaryRows([]);
+    } finally {
+      setSummaryLoading(false);
+    }
   }
 
   async function loadWeekData() {
@@ -826,6 +924,12 @@ const visibleChannels = channels.filter(ch => {
   }
   return true;
 });
+  const summaryTotals = summaryRows.reduce((total, row) => ({
+    planned: total.planned + row.planned,
+    completed: total.completed + row.completed,
+    pending: total.pending + row.pending,
+    overdue: total.overdue + row.overdue,
+  }), { planned: 0, completed: 0, pending: 0, overdue: 0 });
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1035,15 +1139,89 @@ const visibleChannels = channels.filter(ch => {
         </div>
       )}
 
-      {/* Weekly summary */}
-      <div className="bg-surface-1 border border-surface-3 rounded-xl p-4">
-        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3">Resumen semanal</h3>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div><div className="text-lg font-extrabold text-blue-400">{totalPlanned}</div><div className="text-[9px] text-text-muted uppercase tracking-wider">Planificadas</div></div>
-          <div><div className="text-lg font-extrabold text-green-400">{totalCompleted}</div><div className="text-[9px] text-text-muted uppercase tracking-wider">Completadas</div></div>
-          <div><div className="text-lg font-extrabold text-amber-400">{Math.max(0, totalPlanned - plannedVisits.filter(v => v.is_completed).length)}</div><div className="text-[9px] text-text-muted uppercase tracking-wider">Pendientes</div></div>
+      {/* Activity summary by user and period */}
+      <section className="bg-surface-1 border border-surface-3 rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-surface-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-text-primary">Resumen de actividad</h3>
+              <p className="text-[10px] text-text-muted">
+                {isManager && selectedKam === 'all' ? 'Visión automática de todo el equipo' : 'Actividad del KAM seleccionado'}
+              </p>
+            </div>
+            <select value={summaryPeriod} onChange={(e) => setSummaryPeriod(e.target.value)}
+              className="h-9 px-3 rounded-lg border border-surface-3 bg-surface-0 text-xs font-semibold text-text-primary">
+              <option value="week">Semana seleccionada</option>
+              <option value="month">Mes actual</option>
+              <option value="quarter">Trimestre actual</option>
+              <option value="year">Año actual</option>
+              <option value="all">Acumulado</option>
+              <option value="custom">Periodo personalizado</option>
+            </select>
+          </div>
+
+          {summaryPeriod === 'custom' && (
+            <div className="grid grid-cols-2 gap-2 mt-3 max-w-md ml-auto">
+              <div>
+                <label className="block text-[9px] font-bold uppercase text-text-muted mb-1">Desde</label>
+                <input type="date" value={summaryFrom} onChange={(e) => setSummaryFrom(e.target.value)}
+                  className="w-full h-9 px-2 rounded-lg border border-surface-3 bg-surface-0 text-xs" />
+              </div>
+              <div>
+                <label className="block text-[9px] font-bold uppercase text-text-muted mb-1">Hasta</label>
+                <input type="date" value={summaryTo} min={summaryFrom || undefined} onChange={(e) => setSummaryTo(e.target.value)}
+                  className="w-full h-9 px-2 rounded-lg border border-surface-3 bg-surface-0 text-xs" />
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+
+        {summaryLoading ? (
+          <div className="flex items-center justify-center py-10"><Loader2 size={20} className="animate-spin text-brand-400" /></div>
+        ) : summaryPeriod === 'custom' && (!summaryFrom || !summaryTo) ? (
+          <p className="py-8 text-center text-xs text-text-muted">Selecciona las fechas para calcular el resumen.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-5 divide-x divide-surface-3 border-b border-surface-3 bg-surface-0">
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-blue-600">{summaryTotals.planned}</div><div className="text-[8px] font-bold uppercase text-text-muted">Planificadas</div></div>
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-green-600">{summaryTotals.completed}</div><div className="text-[8px] font-bold uppercase text-text-muted">Realizadas</div></div>
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-amber-600">{summaryTotals.pending}</div><div className="text-[8px] font-bold uppercase text-text-muted">Pendientes</div></div>
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-red-600">{summaryTotals.overdue}</div><div className="text-[8px] font-bold uppercase text-text-muted">Vencidas</div></div>
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-text-primary">{summaryTotals.planned ? Math.round((summaryTotals.completed / summaryTotals.planned) * 100) : 0}%</div><div className="text-[8px] font-bold uppercase text-text-muted">Ejecución</div></div>
+            </div>
+
+            <div className="divide-y divide-surface-3">
+              {summaryRows.map(row => (
+                <button key={row.id} type="button"
+                  onClick={() => { if (isManager) setSelectedKam(row.id); }}
+                  className={`w-full px-4 py-3 text-left ${isManager ? 'hover:bg-surface-0 cursor-pointer' : 'cursor-default'} transition-colors`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                    <div className="sm:w-40 min-w-0">
+                      <div className="text-xs font-bold text-text-primary truncate">{row.name}</div>
+                      <div className="text-[9px] text-text-muted">{row.planned ? Math.round((row.completed / row.planned) * 100) : 0}% ejecutado</div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 flex-1 text-center">
+                      <div><span className="text-xs font-bold text-blue-600">{row.planned}</span><span className="block text-[8px] text-text-muted">Planif.</span></div>
+                      <div><span className="text-xs font-bold text-green-600">{row.completed}</span><span className="block text-[8px] text-text-muted">Realiz.</span></div>
+                      <div><span className="text-xs font-bold text-amber-600">{row.pending}</span><span className="block text-[8px] text-text-muted">Pend.</span></div>
+                      <div><span className="text-xs font-bold text-red-600">{row.overdue}</span><span className="block text-[8px] text-text-muted">Venc.</span></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 sm:w-64 sm:justify-end">
+                      {Object.entries(row.types).filter(([, count]) => count > 0).map(([type, count]) => (
+                        <span key={type} className="px-1.5 py-0.5 rounded-md text-[8px] font-semibold"
+                          style={{ color: TYPE_CONFIG[type]?.color || TYPE_CONFIG.other.color, background: TYPE_CONFIG[type]?.bg || TYPE_CONFIG.other.bg }}>
+                          {TYPE_CONFIG[type]?.label || 'Otro'} {count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {summaryRows.length === 0 && <p className="py-8 text-center text-xs text-text-muted">Sin acciones en este periodo.</p>}
+            </div>
+          </>
+        )}
+      </section>
 
       {showNewModal && (
         <NewPlannedActionModal date={selectedDay} channels={channels} onSave={handleSavePlanned} onClose={() => setShowNewModal(false)} />

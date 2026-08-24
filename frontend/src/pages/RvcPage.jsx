@@ -18,6 +18,18 @@ function getSemesterRange(offset = 0) {
   };
 }
 
+const EXCLUDED_RVC_USERS = new Set([
+  'jf nieto',
+  'manager test',
+  'maria teruel',
+  'oscar cubillo',
+  'roberto franza',
+]);
+
+function normalizeUserName(name = '') {
+  return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
 // ============ PÁGINA RVC ============
 export default function RvcPage() {
   const { user, profile, isManager } = useAuthContext();
@@ -25,14 +37,15 @@ export default function RvcPage() {
   const range = getSemesterRange(semesterOffset);
   const [selectedUser, setSelectedUser] = useState('all');
   const [availableUsers, setAvailableUsers] = useState([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
   const [channels, setChannels] = useState([]);
   const [allActiveChannels, setAllActiveChannels] = useState([]);
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user && range?.from && range?.to) loadData();
-  }, [user, semesterOffset, selectedUser]);
+    if (user && range?.from && range?.to && (!isManager || usersLoaded)) loadData();
+  }, [user, semesterOffset, selectedUser, isManager, usersLoaded, availableUsers.length]);
 
   useEffect(() => {
     if (user && isManager) loadAvailableUsers();
@@ -41,7 +54,8 @@ export default function RvcPage() {
   async function loadAvailableUsers() {
     const { data } = await supabase.from('profiles').select('id, full_name, role')
       .eq('is_active', true).in('role', ['kam', 'coordinator', 'manager', 'director']).order('full_name');
-    setAvailableUsers(data || []);
+    setAvailableUsers((data || []).filter(item => !EXCLUDED_RVC_USERS.has(normalizeUserName(item.full_name))));
+    setUsersLoaded(true);
   }
 
   async function loadData() {
@@ -58,6 +72,7 @@ export default function RvcPage() {
         .lte('created_at', toISO);
       if (!isManager) chQuery = chQuery.eq('assigned_to', user.id);
       else if (selectedUser !== 'all') chQuery = chQuery.eq('assigned_to', selectedUser);
+      else if (availableUsers.length > 0) chQuery = chQuery.in('assigned_to', availableUsers.map(item => item.id));
       const { data: chData } = await chQuery;
       setChannels(chData || []);
 
@@ -68,6 +83,7 @@ export default function RvcPage() {
         .eq('status', 'activo');
       if (!isManager) activeQuery = activeQuery.eq('assigned_to', user.id);
       else if (selectedUser !== 'all') activeQuery = activeQuery.eq('assigned_to', selectedUser);
+      else if (availableUsers.length > 0) activeQuery = activeQuery.in('assigned_to', availableUsers.map(item => item.id));
       const { data: activeData } = await activeQuery;
       setAllActiveChannels(activeData || []);
 
@@ -79,6 +95,7 @@ export default function RvcPage() {
         .lte('checkin_at', toISO);
       if (!isManager) vQuery = vQuery.eq('kam_id', user.id);
       else if (selectedUser !== 'all') vQuery = vQuery.eq('kam_id', selectedUser);
+      else if (availableUsers.length > 0) vQuery = vQuery.in('kam_id', availableUsers.map(item => item.id));
       const { data: vData } = await vQuery;
       setVisits(vData || []);
     } catch (err) {

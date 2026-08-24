@@ -21,23 +21,23 @@ export default function ChannelAttentionAlerts({ channelId, refreshKey = 0, isCa
   async function loadAlerts() {
     setLoading(true);
     try {
-      const [visitsRes, interactionsRes, meetingsRes, businessCaseRes] = await Promise.all([
-        supabase.from('visits').select('checkin_at').eq('channel_id', channelId).order('checkin_at', { ascending: false }).limit(1),
-        supabase.from('channel_interactions').select('created_at, planned_date, is_completed').eq('channel_id', channelId).order('created_at', { ascending: false }).limit(100),
+      const [activityRes, meetingsRes, businessCaseRes] = await Promise.all([
+        supabase.from('channel_activity_feed').select('status, scheduled_date, occurred_at')
+          .eq('channel_id', channelId).limit(200),
         supabase.from('channel_meetings').select('meeting_date, created_at').eq('channel_id', channelId).order('created_at', { ascending: false }).limit(1),
         supabase.from('business_cases').select('id').eq('channel_id', channelId).limit(1),
       ]);
 
-      const interactions = interactionsRes.data || [];
-      const planned = interactions.filter(item => item.planned_date && item.is_completed !== true);
+      if (activityRes.error) throw activityRes.error;
+      const activity = activityRes.data || [];
+      const planned = activity.filter(item => item.scheduled_date && ['planned', 'overdue'].includes(item.status));
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayKey = today.toISOString().slice(0, 10);
-      const overdue = planned.filter(item => item.planned_date < todayKey);
+      const overdue = planned.filter(item => item.status === 'overdue' || item.scheduled_date < todayKey);
 
       const activityDates = [
-        visitsRes.data?.[0]?.checkin_at,
-        interactions.find(item => item.is_completed === true || (item.is_completed !== false && !item.planned_date))?.created_at,
+        ...activity.map(item => item.occurred_at),
         meetingsRes.data?.[0]?.meeting_date || meetingsRes.data?.[0]?.created_at,
       ].filter(Boolean).map(value => new Date(value));
       const lastActivity = activityDates.sort((a, b) => b - a)[0];

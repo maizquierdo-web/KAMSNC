@@ -36,12 +36,10 @@ function formatActionDate(dateValue) {
   return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
-function latestByDate(items) {
-  return items.filter(item => item.date).sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
-}
-
-function nextByDate(items) {
-  return items.filter(item => item.date).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+function sourceFromTable(sourceTable) {
+  if (sourceTable === 'planned_visits') return 'planned_visit';
+  if (sourceTable === 'visit_followup') return 'visit_followup';
+  return 'interaction';
 }
 
 export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned, onActivityChange }) {
@@ -68,47 +66,40 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
 
     async function loadSummary() {
       setLoading(true);
-      const [visitsRes, interactionsRes, meetingsRes, plannedVisitsRes, profileRes] = await Promise.all([
-        supabase.from('visits').select('id, checkin_at, next_action_date, next_steps')
-          .eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(50),
-        supabase.from('channel_interactions')
-          .select('id, interaction_type, subject, notes, created_at, planned_date, planned_time, is_completed')
-          .eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(100),
+      const [activityRes, meetingsRes, profileRes] = await Promise.all([
+        supabase.from('channel_activity_feed').select('*')
+          .eq('channel_id', channel.id).limit(200),
         supabase.from('channel_meetings').select('meeting_date, created_at')
           .eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(50),
-        supabase.from('planned_visits').select('id, planned_date, planned_time, notes, is_completed')
-          .eq('channel_id', channel.id).eq('is_completed', false).order('planned_date', { ascending: true }).limit(50),
         supabase.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
       ]);
 
       if (!active) return;
-      const visits = visitsRes.data || [];
-      const interactions = interactionsRes.data || [];
+      if (activityRes.error) throw activityRes.error;
+      const activity = activityRes.data || [];
       const meetings = meetingsRes.data || [];
-      const plannedVisits = plannedVisitsRes.data || [];
 
-      const latestActivity = latestByDate([
-        ...visits.map(v => ({ date: v.checkin_at, label: 'Visita' })),
-        ...interactions.filter(i => i.is_completed === true || (i.is_completed !== false && !i.planned_date))
-          .map(i => ({ date: i.created_at, label: TYPE_LABELS[i.interaction_type] || 'Actividad' })),
-        ...meetings.map(m => ({ date: m.meeting_date, label: 'Reunión' })),
-      ]);
+      const completed = activity
+        .filter(item => item.occurred_at)
+        .map(item => ({ date: item.occurred_at, label: TYPE_LABELS[item.activity_type] || 'Actividad' }));
+      const meetingActivity = meetings
+        .map(item => ({ date: item.meeting_date || item.created_at, label: 'Reunión' }))
+        .filter(item => item.date);
+      const latestActivity = [...completed, ...meetingActivity]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))[0] || null;
 
-      const nextAction = nextByDate([
-        ...interactions.filter(i => i.planned_date && i.is_completed !== true).map(i => ({
-          id: i.id, source: 'interaction', type: i.interaction_type,
-          date: i.planned_date, time: i.planned_time,
-          label: TYPE_LABELS[i.interaction_type] || 'Acción', detail: i.subject || i.notes,
-        })),
-        ...plannedVisits.map(v => ({
-          id: v.id, source: 'planned_visit', type: 'visit',
-          date: v.planned_date, time: v.planned_time, label: 'Visita', detail: v.notes,
-        })),
-        ...visits.filter(v => v.next_action_date && v.next_steps).map(v => ({
-          id: v.id, source: 'visit_followup', type: 'other',
-          date: v.next_action_date, label: 'Seguimiento', detail: v.next_steps,
-        })),
-      ]);
+      const nextItem = activity
+        .filter(item => item.scheduled_date && ['planned', 'overdue'].includes(item.status))
+        .sort((a, b) => `${a.scheduled_date}T${a.scheduled_time || '23:59'}`.localeCompare(`${b.scheduled_date}T${b.scheduled_time || '23:59'}`))[0];
+      const nextAction = nextItem ? {
+        id: nextItem.source_id,
+        source: sourceFromTable(nextItem.source_table),
+        type: nextItem.activity_type,
+        date: nextItem.scheduled_date,
+        time: nextItem.scheduled_time,
+        label: TYPE_LABELS[nextItem.activity_type] || 'Acción',
+        detail: nextItem.subject || nextItem.notes,
+      } : null;
 
       setSummary({
         latestActivity,
@@ -119,7 +110,10 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
       setLoading(false);
     }
 
-    loadSummary();
+    loadSummary().catch((error) => {
+      console.error('No se pudo cargar el resumen de actividad:', error);
+      if (active) setLoading(false);
+    });
     return () => { active = false; };
   }, [channel.id, channel.assigned_to, refreshKey]);
 

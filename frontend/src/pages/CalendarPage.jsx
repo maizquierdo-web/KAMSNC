@@ -311,7 +311,7 @@ function EventCard({ event, onDelete, onComplete }) {
         <Icon size={12} style={{ color: cfg.color }} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm font-semibold truncate ${isCompleted ? 'line-through text-text-secondary' : ''}`}>
+        <div className={`text-sm font-semibold truncate ${isCompleted ? 'text-text-primary' : ''}`}>
           {event._channelName || 'Canal'}
         </div>
         <div className="text-[10px] text-text-muted truncate">
@@ -410,6 +410,8 @@ export default function CalendarPage() {
   const [plannedVisits, setPlannedVisits] = useState([]);
   const [plannedActions, setPlannedActions] = useState([]);
   const [completedVisits, setCompletedVisits] = useState([]);
+  const [overdueEvents, setOverdueEvents] = useState([]);
+  const [priorityCounts, setPriorityCounts] = useState({ overdue: 0, today: 0, upcoming: 0 });
   const [channels, setChannels] = useState([]);
   const [activityChannelIds, setActivityChannelIds] = useState(new Set());
   const [dateType, setDateType] = useState('creation');
@@ -419,6 +421,7 @@ export default function CalendarPage() {
   const [selectedKam, setSelectedKam] = useState('all');
   const [teamKams, setTeamKams] = useState([]);
   const [viewMode, setViewMode] = useState('day');
+  const [onlyPending, setOnlyPending] = useState(false);
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
@@ -450,7 +453,9 @@ export default function CalendarPage() {
       const startStr = formatDateKey(currentWeekStart);
       const endStr = formatDateKey(weekEnd);
 
-      const [plannedRes, actionsRes, visitsRes] = await Promise.all([
+      const todayKey = formatDateKey(new Date());
+      const tomorrowKey = formatDateKey(addDays(new Date(), 1));
+      const [plannedRes, actionsRes, visitsRes, overdueVisitsRes, overdueActionsRes, todayVisitsRes, todayActionsRes, upcomingVisitsRes, upcomingActionsRes] = await Promise.all([
         (() => {
           let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
            if (dateType === 'activity_change') {
@@ -481,11 +486,78 @@ export default function CalendarPage() {
           else if (!isManager) q = q.eq('kam_id', user.id);
           return q;
         })(),
+        (() => {
+          let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
+            .lt('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
+          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
+          else if (!isManager) q = q.eq('kam_id', user.id);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
+            .not('planned_date', 'is', null).lt('planned_date', todayKey)
+            .or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
+          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
+          else if (!isManager) q = q.eq('user_id', user.id);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
+            .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
+          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
+          else if (!isManager) q = q.eq('kam_id', user.id);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
+            .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
+          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
+          else if (!isManager) q = q.eq('user_id', user.id);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
+            .gte('planned_date', tomorrowKey).or('is_completed.eq.false,is_completed.is.null');
+          if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
+          else if (!isManager) q = q.eq('kam_id', user.id);
+          return q;
+        })(),
+        (() => {
+          let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
+            .gte('planned_date', tomorrowKey).or('is_completed.eq.false,is_completed.is.null');
+          if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
+          else if (!isManager) q = q.eq('user_id', user.id);
+          return q;
+        })(),
       ]);
 
       setPlannedVisits(plannedRes.data || []);
       setPlannedActions(actionsRes.data || []);
       setCompletedVisits(visitsRes.data || []);
+      const overdue = [
+        ...(overdueVisitsRes.data || []).map(v => ({
+          _type: 'visit', _source: 'planned_visit', _sourceId: v.id,
+          _channelId: v.channel_id, _userId: v.kam_id,
+          planned_date: v.planned_date, planned_time: v.planned_time,
+          notes: v.notes, is_completed: false,
+          _channelName: v.channels?.name, _channelAddress: v.channels?.address,
+          _kamName: selectedKam === 'all' ? v.profiles?.full_name : null,
+        })),
+        ...(overdueActionsRes.data || []).map(a => ({
+          _type: a.interaction_type, _source: 'interaction', _sourceId: a.id,
+          _channelId: a.channel_id, _userId: a.user_id,
+          planned_date: a.planned_date, planned_time: a.planned_time,
+          notes: a.notes, is_completed: false,
+          _channelName: a.channels?.name, _channelAddress: a.channels?.address,
+          _kamName: selectedKam === 'all' ? a.profiles?.full_name : null,
+        })),
+      ].sort((a, b) => `${a.planned_date} ${a.planned_time || ''}`.localeCompare(`${b.planned_date} ${b.planned_time || ''}`));
+      setOverdueEvents(overdue);
+      setPriorityCounts({
+        overdue: overdue.length,
+        today: (todayVisitsRes.count || 0) + (todayActionsRes.count || 0),
+        upcoming: (upcomingVisitsRes.count || 0) + (upcomingActionsRes.count || 0),
+      });
       const ids = new Set();
 (plannedRes.data || []).forEach(v => { if (v?.channel_id) ids.add(v.channel_id); });
 (actionsRes.data || []).forEach(a => { if (a?.channel_id) ids.add(a.channel_id); });
@@ -626,7 +698,9 @@ setActivityChannelIds(ids);
       }
     });
 
-    return events.sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
+    return events
+      .filter(event => !onlyPending || !event.is_completed)
+      .sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
   }
 
   function getDayCount(day) {
@@ -681,6 +755,30 @@ const visibleChannels = channels.filter(ch => {
         <KamSelector kams={teamKams} selected={selectedKam} onChange={setSelectedKam} />
       )}
 
+      {/* Automatic priority overview */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className={`rounded-xl border px-3 py-3 ${priorityCounts.overdue > 0 ? 'bg-red-50 border-red-200' : 'bg-surface-1 border-surface-3'}`}>
+          <div className={`text-xl font-extrabold ${priorityCounts.overdue > 0 ? 'text-red-600' : 'text-text-muted'}`}>{priorityCounts.overdue}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Vencidas</div>
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3">
+          <div className="text-xl font-extrabold text-blue-600">{priorityCounts.today}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Hoy</div>
+        </div>
+        <div className="rounded-xl border border-surface-3 bg-surface-1 px-3 py-3">
+          <div className="text-xl font-extrabold text-text-primary">{priorityCounts.upcoming}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Próximas</div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <label className="inline-flex items-center gap-2 text-[11px] text-text-secondary cursor-pointer select-none">
+          <input type="checkbox" checked={onlyPending} onChange={(e) => setOnlyPending(e.target.checked)}
+            className="w-3.5 h-3.5 accent-brand-500" />
+          Solo pendientes
+        </label>
+      </div>
+
       {/* Legend */}
       <div className="flex flex-wrap gap-2">
         {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'other').map(([key, cfg]) => (
@@ -707,6 +805,29 @@ const visibleChannels = channels.filter(ch => {
         <button onClick={goToday} className="text-xs font-semibold text-brand-400 px-3 py-1.5 rounded-lg hover:bg-brand-500/10 transition-colors">Hoy</button>
         <button onClick={nextWeek} className="p-2 rounded-lg hover:bg-surface-2 text-text-secondary transition-colors"><ChevronRight size={18} /></button>
       </div>
+
+      {/* Overdue actions always stay visible before the selected day */}
+      {overdueEvents.length > 0 && (
+        <section className="bg-red-50/70 border border-red-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-red-200">
+            <div>
+              <h2 className="text-sm font-bold text-red-700">Acciones vencidas</h2>
+              <p className="text-[10px] text-red-500">Pendientes de días anteriores</p>
+            </div>
+            <span className="min-w-6 h-6 px-2 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center">{overdueEvents.length}</span>
+          </div>
+          <div className="p-3 space-y-2">
+            {overdueEvents.map(event => (
+              <div key={`${event._source}-${event._sourceId}`}>
+                <div className="mb-1 pl-1 text-[9px] font-bold uppercase tracking-wider text-red-500">
+                  {new Date(`${event.planned_date}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </div>
+                <EventCard event={event} onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Week grid */}
       <div className="grid grid-cols-7 gap-1.5">

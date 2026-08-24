@@ -293,8 +293,72 @@ function CompleteActionModal({ event, onSave, onClose }) {
   );
 }
 
+// ============ RESCHEDULE MODAL ============
+function RescheduleActionModal({ event, onSave, onClose }) {
+  const [date, setDate] = useState(event?.planned_date || formatDateKey(new Date()));
+  const [time, setTime] = useState(event?.planned_time?.slice(0, 5) || '09:00');
+  const [notes, setNotes] = useState(event?.notes || '');
+  const [saving, setSaving] = useState(false);
+  const fieldClass = 'w-full px-3 py-2.5 bg-surface-0 border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 transition-colors';
+
+  async function handleSave() {
+    if (!date) return;
+    setSaving(true);
+    try {
+      await onSave({
+        planned_date: date,
+        planned_time: `${time}:00`,
+        notes: notes.trim() || null,
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/35 backdrop-blur-[1px] z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="bg-surface-1 border border-surface-3 rounded-t-2xl sm:rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between p-4 border-b border-surface-3">
+          <div>
+            <h3 className="font-bold text-sm">Reprogramar acción</h3>
+            <p className="text-xs text-text-secondary">{event?._channelName} · {TYPE_CONFIG[event?._type]?.label || 'Acción'}</p>
+          </div>
+          <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={20} /></button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Nueva fecha *</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={fieldClass} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Hora</label>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={fieldClass} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Objetivo</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+              placeholder="¿Qué hay que conseguir?" className={`${fieldClass} resize-none`} />
+          </div>
+          <p className="text-[10px] text-text-muted">Se actualizará esta acción; no se creará ningún registro nuevo.</p>
+        </div>
+
+        <div className="p-4 border-t border-surface-3">
+          <button onClick={handleSave} disabled={!date || saving}
+            className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
+            Guardar nueva fecha
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ EVENT CARD ============
-function EventCard({ event, onDelete, onComplete }) {
+function EventCard({ event, onDelete, onComplete, onReschedule }) {
   const time = event.planned_time ? event.planned_time.slice(0, 5) : '--:--';
   const cfg = TYPE_CONFIG[event._type] || TYPE_CONFIG.other;
   const Icon = cfg.icon;
@@ -326,6 +390,10 @@ function EventCard({ event, onDelete, onComplete }) {
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-green-500/20 text-green-400">✓</span>
         ) : (
           <>
+            <button onClick={(e) => { e.stopPropagation(); onReschedule?.(event); }}
+              className="px-2 py-1.5 bg-surface-1 hover:bg-surface-2 text-text-secondary border border-surface-3 rounded-lg text-[10px] font-semibold transition-colors flex items-center gap-1">
+              <Clock size={11} /> <span className="hidden sm:inline">Reprogramar</span>
+            </button>
             {event._type !== 'visit' && (
               <button onClick={(e) => { e.stopPropagation(); onComplete?.(event); }}
                 className="px-2.5 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-[10px] font-bold transition-colors">Completar</button>
@@ -417,6 +485,7 @@ export default function CalendarPage() {
   const [dateType, setDateType] = useState('creation');
   const [showNewModal, setShowNewModal] = useState(false);
   const [eventToComplete, setEventToComplete] = useState(null);
+  const [eventToReschedule, setEventToReschedule] = useState(null);
   const [toast, setToast] = useState(null);
   const [selectedKam, setSelectedKam] = useState('all');
   const [teamKams, setTeamKams] = useState([]);
@@ -674,6 +743,22 @@ setActivityChannelIds(ids);
     }
   }
 
+  async function handleSaveReschedule(changes) {
+    const event = eventToReschedule;
+    if (!event) return;
+    try {
+      const table = event._source === 'planned_visit' ? 'planned_visits' : 'channel_interactions';
+      const { error } = await supabase.from(table).update(changes).eq('id', event._sourceId);
+      if (error) throw error;
+      setEventToReschedule(null);
+      await loadWeekData();
+      setToast({ message: '✓ Acción reprogramada', type: 'success' });
+    } catch (err) {
+      console.error(err);
+      setToast({ message: 'Error: ' + err.message, type: 'error' });
+    }
+  }
+
   // Merge all events for a given day
   function getDayEvents(day) {
     const key = formatDateKey(day);
@@ -683,7 +768,7 @@ setActivityChannelIds(ids);
     plannedVisits.filter(v => v.planned_date === key).forEach(v => {
       events.push({
         _type: 'visit', _source: 'planned_visit', _sourceId: v.id,
-        planned_time: v.planned_time, notes: v.notes, is_completed: v.is_completed,
+        planned_date: v.planned_date, planned_time: v.planned_time, notes: v.notes, is_completed: v.is_completed,
         _channelName: v.channels?.name, _channelAddress: v.channels?.address,
         _kamName: selectedKam === 'all' ? v.profiles?.full_name : null,
       });
@@ -694,7 +779,7 @@ setActivityChannelIds(ids);
       events.push({
         _type: a.interaction_type, _source: 'interaction', _sourceId: a.id,
         _channelId: a.channel_id, _userId: a.user_id,
-        planned_time: a.planned_time, notes: a.notes, is_completed: a.is_completed,
+        planned_date: a.planned_date, planned_time: a.planned_time, notes: a.notes, is_completed: a.is_completed,
         _channelName: a.channels?.name, _channelAddress: a.channels?.address,
         _kamName: selectedKam === 'all' ? a.profiles?.full_name : null,
       });
@@ -836,7 +921,8 @@ const visibleChannels = channels.filter(ch => {
                 <div className="mb-1 pl-1 text-[9px] font-bold uppercase tracking-wider text-red-500">
                   {new Date(`${event.planned_date}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </div>
-                <EventCard event={event} onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} />
+                <EventCard event={event} onDelete={handleDeleteEvent} onComplete={handleCompleteEvent}
+                  onReschedule={setEventToReschedule} />
               </div>
             ))}
           </div>
@@ -894,7 +980,7 @@ const visibleChannels = channels.filter(ch => {
             <div className="space-y-2">
               {dayEvents.map(event => (
                 <EventCard key={`${event._source}-${event._sourceId}`} event={event}
-                  onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} />
+                  onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule} />
               ))}
               <button onClick={() => setShowNewModal(true)}
                 className="w-full py-2.5 border border-dashed border-surface-3 hover:border-blue-300 hover:bg-blue-50/50 rounded-xl text-xs font-semibold text-text-muted hover:text-blue-500 transition-colors">
@@ -937,7 +1023,7 @@ const visibleChannels = channels.filter(ch => {
                       <div className="space-y-2">
                         {events.map(event => (
                           <EventCard key={`${event._source}-${event._sourceId}`} event={event}
-                            onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} />
+                            onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule} />
                         ))}
                       </div>
                     )}
@@ -965,6 +1051,10 @@ const visibleChannels = channels.filter(ch => {
 
       {eventToComplete && (
         <CompleteActionModal event={eventToComplete} onSave={handleSaveCompletion} onClose={() => setEventToComplete(null)} />
+      )}
+
+      {eventToReschedule && (
+        <RescheduleActionModal event={eventToReschedule} onSave={handleSaveReschedule} onClose={() => setEventToReschedule(null)} />
       )}
 
       {toast && (

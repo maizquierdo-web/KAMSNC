@@ -11,17 +11,20 @@ const ONBOARDING_OPTIONS = [
 ];
 
 const CAES_ROLE_OPTIONS = [
+  { value: 'pending', label: 'Pendiente de definir' },
   { value: 'promoter', label: 'Promotor' },
   { value: 'promoter_ot', label: 'Promotor + OT' },
   { value: 'promoter_ot_verifier', label: 'Promotor + OT + Verificador' },
 ];
 
 const CONTRACT_OPTIONS = [
+  { value: 'pending', label: 'Pendiente de definir' },
   { value: 'model_2_alternative_payer', label: 'Modelo 2 · Pagador alternativo' },
   { value: 'model_3_savings_facilitator', label: 'Modelo 3 · Facilitador de ahorro' },
 ];
 
 const TIER_OPTIONS = [
+  { value: 'pending', label: 'Pendiente de definir' },
   { value: 'tier_a', label: 'Tramo A' },
   { value: 'tier_b', label: 'Tramo B' },
   { value: 'tier_c', label: 'Tramo C' },
@@ -52,9 +55,9 @@ function Field({ label, value, options, onChange, disabled, required = false }) 
 export default function ChannelOnboardingDetails({ channel, isCaes = false, onUpdate }) {
   const [values, setValues] = useState({
     onboarding_status: channel.onboarding_status || '',
-    caes_role: channel.caes_role || '',
-    caes_contract_model: channel.caes_contract_model || '',
-    caes_remuneration_tier: channel.caes_remuneration_tier || '',
+    caes_role: channel.caes_role || 'pending',
+    caes_contract_model: channel.caes_contract_model || 'pending',
+    caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
   });
   const [savingField, setSavingField] = useState('');
   const [saved, setSaved] = useState(false);
@@ -64,27 +67,28 @@ export default function ChannelOnboardingDetails({ channel, isCaes = false, onUp
   useEffect(() => {
     setValues({
       onboarding_status: channel.onboarding_status || '',
-      caes_role: channel.caes_role || '',
-      caes_contract_model: channel.caes_contract_model || '',
-      caes_remuneration_tier: channel.caes_remuneration_tier || '',
+      caes_role: channel.caes_role || 'pending',
+      caes_contract_model: channel.caes_contract_model || 'pending',
+      caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
     });
   }, [channel.id, channel.onboarding_status, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier]);
 
   async function updateField(field, value) {
     const previous = values[field];
+    const storedValue = value === 'pending' ? null : value;
     setValues(current => ({ ...current, [field]: value || '' }));
     setSavingField(field);
     setSaved(false);
     setError('');
     try {
       const changedAt = new Date().toISOString();
-      const changes = { [field]: value, updated_at: changedAt };
+      const changes = { [field]: storedValue, updated_at: changedAt };
       if (field === 'onboarding_status') changes.onboarding_status_changed_at = changedAt;
       const { error: updateError } = await supabase.from('channels')
         .update(changes)
         .eq('id', channel.id);
       if (updateError) throw updateError;
-      onUpdate?.(field === 'onboarding_status' ? { [field]: value, onboarding_status_changed_at: changedAt } : { [field]: value });
+      onUpdate?.(field === 'onboarding_status' ? { [field]: storedValue, onboarding_status_changed_at: changedAt } : { [field]: storedValue });
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1800);
     } catch (updateError) {

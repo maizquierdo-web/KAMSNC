@@ -236,6 +236,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
   todayStart.setHours(0, 0, 0, 0);
   const nextActionAlert = summary.nextAction
     && new Date(`${summary.nextAction.date}T00:00:00`) < todayStart;
+  const noActivity = !summary.latestActivity;
   const potential = channel.potencial_caes || channel.potencial_energia || 'Sin valorar';
   const potentialStyle = {
     Bajo: 'border-slate-200 bg-slate-50 text-slate-600',
@@ -246,13 +247,13 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
 
   return (
     <div className="mb-4 grid grid-cols-2 overflow-visible rounded-xl border border-surface-3 bg-white lg:grid-cols-4">
-      <div className="flex min-w-0 items-center gap-3 border-b border-r border-surface-3 bg-blue-50/40 p-3.5 lg:border-b-0">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+      <div className={`flex min-w-0 items-center gap-3 border-b border-r border-surface-3 p-3.5 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-blue-50/40'}`}>
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
           <Clock3 size={20} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Última actividad</div>
-          <div className="truncate text-sm font-bold text-slate-700">
+          <div className={`truncate text-sm font-bold ${noActivity ? 'text-amber-700' : 'text-slate-700'}`}>
             {summary.latestActivity
               ? `${formatRelativeDate(summary.latestActivity.date)} · ${summary.latestActivity.label}` : 'Sin actividad'}
           </div>

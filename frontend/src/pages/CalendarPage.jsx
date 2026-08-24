@@ -455,6 +455,11 @@ export default function CalendarPage() {
 
       const todayKey = formatDateKey(new Date());
       const tomorrowKey = formatDateKey(addDays(new Date(), 1));
+      const todayInSelectedWeek = todayKey >= startStr && todayKey < endStr;
+      const overdueEndStr = todayKey < endStr ? todayKey : endStr;
+      const hasOverdueRange = startStr < overdueEndStr;
+      const upcomingStartStr = tomorrowKey > startStr ? tomorrowKey : startStr;
+      const hasUpcomingRange = upcomingStartStr < endStr;
       const [plannedRes, actionsRes, visitsRes, overdueVisitsRes, overdueActionsRes, todayVisitsRes, todayActionsRes, upcomingVisitsRes, upcomingActionsRes] = await Promise.all([
         (() => {
           let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
@@ -487,21 +492,25 @@ export default function CalendarPage() {
           return q;
         })(),
         (() => {
+          if (!hasOverdueRange) return Promise.resolve({ data: [] });
           let q = supabase.from('planned_visits').select('*, channels(name, address), profiles(full_name)')
-            .lt('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
+            .gte('planned_date', startStr).lt('planned_date', overdueEndStr)
+            .or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
           if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
           else if (!isManager) q = q.eq('kam_id', user.id);
           return q;
         })(),
         (() => {
+          if (!hasOverdueRange) return Promise.resolve({ data: [] });
           let q = supabase.from('channel_interactions').select('*, channels(name, address), profiles(full_name)')
-            .not('planned_date', 'is', null).lt('planned_date', todayKey)
+            .not('planned_date', 'is', null).gte('planned_date', startStr).lt('planned_date', overdueEndStr)
             .or('is_completed.eq.false,is_completed.is.null').order('planned_date').order('planned_time');
           if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
           else if (!isManager) q = q.eq('user_id', user.id);
           return q;
         })(),
         (() => {
+          if (!todayInSelectedWeek) return Promise.resolve({ count: 0 });
           let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
             .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
           if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
@@ -509,6 +518,7 @@ export default function CalendarPage() {
           return q;
         })(),
         (() => {
+          if (!todayInSelectedWeek) return Promise.resolve({ count: 0 });
           let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
             .eq('planned_date', todayKey).or('is_completed.eq.false,is_completed.is.null');
           if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
@@ -516,15 +526,19 @@ export default function CalendarPage() {
           return q;
         })(),
         (() => {
+          if (!hasUpcomingRange) return Promise.resolve({ count: 0 });
           let q = supabase.from('planned_visits').select('id', { count: 'exact', head: true })
-            .gte('planned_date', tomorrowKey).or('is_completed.eq.false,is_completed.is.null');
+            .gte('planned_date', upcomingStartStr).lt('planned_date', endStr)
+            .or('is_completed.eq.false,is_completed.is.null');
           if (selectedKam !== 'all') q = q.eq('kam_id', selectedKam);
           else if (!isManager) q = q.eq('kam_id', user.id);
           return q;
         })(),
         (() => {
+          if (!hasUpcomingRange) return Promise.resolve({ count: 0 });
           let q = supabase.from('channel_interactions').select('id', { count: 'exact', head: true })
-            .gte('planned_date', tomorrowKey).or('is_completed.eq.false,is_completed.is.null');
+            .gte('planned_date', upcomingStartStr).lt('planned_date', endStr)
+            .or('is_completed.eq.false,is_completed.is.null');
           if (selectedKam !== 'all') q = q.eq('user_id', selectedKam);
           else if (!isManager) q = q.eq('user_id', user.id);
           return q;
@@ -812,7 +826,7 @@ const visibleChannels = channels.filter(ch => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-red-200">
             <div>
               <h2 className="text-sm font-bold text-red-700">Acciones vencidas</h2>
-              <p className="text-[10px] text-red-500">Pendientes de días anteriores</p>
+              <p className="text-[10px] text-red-500">Pendientes de la semana seleccionada</p>
             </div>
             <span className="min-w-6 h-6 px-2 rounded-full bg-red-100 text-red-700 text-xs font-bold flex items-center justify-center">{overdueEvents.length}</span>
           </div>

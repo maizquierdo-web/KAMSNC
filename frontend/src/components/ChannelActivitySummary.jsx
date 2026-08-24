@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuthContext } from './AuthProvider';
 import {
-  ArrowRightLeft, CalendarDays, Check, ChevronDown, Clock3, Loader2, TrendingUp,
+  ArrowRightLeft, CalendarDays, Check, ChevronDown, Clock3, Loader2, Save, TrendingUp, X,
 } from 'lucide-react';
 
 const TYPE_LABELS = {
@@ -43,13 +44,18 @@ function nextByDate(items) {
   return items.filter(item => item.date).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
 }
 
-export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned }) {
+export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned, onActivityChange }) {
+  const { user } = useAuthContext();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [kams, setKams] = useState([]);
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassigning, setReassigning] = useState(false);
   const [reassignError, setReassignError] = useState('');
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionForm, setActionForm] = useState({ type: 'call', date: '', time: '09:00', detail: '' });
+  const [savingAction, setSavingAction] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     supabase.from('profiles').select('id, full_name, zone, role')
@@ -63,14 +69,14 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
     async function loadSummary() {
       setLoading(true);
       const [visitsRes, interactionsRes, meetingsRes, plannedVisitsRes, profileRes] = await Promise.all([
-        supabase.from('visits').select('checkin_at, next_action_date, next_steps')
+        supabase.from('visits').select('id, checkin_at, next_action_date, next_steps')
           .eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(50),
         supabase.from('channel_interactions')
-          .select('interaction_type, subject, notes, created_at, planned_date, planned_time, is_completed')
+          .select('id, interaction_type, subject, notes, created_at, planned_date, planned_time, is_completed')
           .eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(100),
         supabase.from('channel_meetings').select('meeting_date, created_at')
           .eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(50),
-        supabase.from('planned_visits').select('planned_date, planned_time, notes, is_completed')
+        supabase.from('planned_visits').select('id, planned_date, planned_time, notes, is_completed')
           .eq('channel_id', channel.id).eq('is_completed', false).order('planned_date', { ascending: true }).limit(50),
         supabase.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
       ]);
@@ -90,13 +96,16 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
 
       const nextAction = nextByDate([
         ...interactions.filter(i => i.planned_date && i.is_completed !== true).map(i => ({
+          id: i.id, source: 'interaction', type: i.interaction_type,
           date: i.planned_date, time: i.planned_time,
           label: TYPE_LABELS[i.interaction_type] || 'Acción', detail: i.subject || i.notes,
         })),
         ...plannedVisits.map(v => ({
+          id: v.id, source: 'planned_visit', type: 'visit',
           date: v.planned_date, time: v.planned_time, label: 'Visita', detail: v.notes,
         })),
         ...visits.filter(v => v.next_action_date && v.next_steps).map(v => ({
+          id: v.id, source: 'visit_followup', type: 'other',
           date: v.next_action_date, label: 'Seguimiento', detail: v.next_steps,
         })),
       ]);
@@ -136,6 +145,91 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
     }
   }
 
+  function openActionEditor() {
+    const action = summary.nextAction;
+    setActionForm({
+      type: action?.type || 'call',
+      date: action?.date || '',
+      time: action?.time?.slice?.(0, 5) || '09:00',
+      detail: action?.detail || '',
+    });
+    setActionError('');
+    setActionOpen(true);
+  }
+
+  async function saveNextAction() {
+    if (!actionForm.date) { setActionError('Indica una fecha.'); return; }
+    setSavingAction(true);
+    setActionError('');
+    try {
+      const current = summary.nextAction;
+      let error;
+      if (current?.source === 'interaction') {
+        ({ error } = await supabase.from('channel_interactions').update({
+          interaction_type: actionForm.type,
+          planned_date: actionForm.date,
+          planned_time: actionForm.time ? `${actionForm.time}:00` : null,
+          notes: actionForm.detail || null,
+        }).eq('id', current.id));
+      } else if (current?.source === 'planned_visit') {
+        ({ error } = await supabase.from('planned_visits').update({
+          planned_date: actionForm.date,
+          planned_time: actionForm.time ? `${actionForm.time}:00` : null,
+          notes: actionForm.detail || null,
+        }).eq('id', current.id));
+      } else if (current?.source === 'visit_followup') {
+        ({ error } = await supabase.from('visits').update({
+          next_action_date: actionForm.date,
+          next_steps: actionForm.detail || 'Seguimiento',
+        }).eq('id', current.id));
+      } else {
+        ({ error } = await supabase.from('channel_interactions').insert({
+          channel_id: channel.id,
+          user_id: user.id,
+          interaction_type: actionForm.type,
+          direction: 'outbound',
+          planned_date: actionForm.date,
+          planned_time: actionForm.time ? `${actionForm.time}:00` : null,
+          notes: actionForm.detail || null,
+          is_completed: false,
+        }));
+      }
+      if (error) throw error;
+      setActionOpen(false);
+      onActivityChange?.();
+    } catch (error) {
+      console.error('Error guardando la siguiente acción:', error);
+      setActionError('No se pudo guardar la acción. Inténtalo de nuevo.');
+    } finally {
+      setSavingAction(false);
+    }
+  }
+
+  async function completeNextAction() {
+    const current = summary.nextAction;
+    if (!current) return;
+    setSavingAction(true);
+    setActionError('');
+    try {
+      let error;
+      if (current.source === 'interaction') {
+        ({ error } = await supabase.from('channel_interactions').update({ is_completed: true }).eq('id', current.id));
+      } else if (current.source === 'planned_visit') {
+        ({ error } = await supabase.from('planned_visits').update({ is_completed: true }).eq('id', current.id));
+      } else {
+        ({ error } = await supabase.from('visits').update({ next_action_date: null, next_steps: null }).eq('id', current.id));
+      }
+      if (error) throw error;
+      setActionOpen(false);
+      onActivityChange?.();
+    } catch (error) {
+      console.error('Error completando la siguiente acción:', error);
+      setActionError('No se pudo completar la acción.');
+    } finally {
+      setSavingAction(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="mb-4 flex items-center justify-center rounded-xl border border-surface-3 bg-surface-1 py-6">
@@ -171,7 +265,9 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center gap-3 border-b border-surface-3 bg-orange-50/40 p-3.5 lg:border-b-0 lg:border-r">
+      <div onClick={openActionEditor} role="button" tabIndex={0}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openActionEditor(); }}
+        className="relative flex min-w-0 cursor-pointer items-center gap-3 border-b border-surface-3 bg-orange-50/40 p-3.5 transition-colors hover:bg-orange-50 lg:border-b-0 lg:border-r">
         <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
           <CalendarDays size={20} />
         </div>
@@ -187,6 +283,49 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
             </div>
           )}
         </div>
+        <ChevronDown size={14} className={`ml-auto flex-shrink-0 text-orange-400 transition-transform ${actionOpen ? 'rotate-180' : ''}`} />
+
+        {actionOpen && (
+          <div onClick={(event) => event.stopPropagation()}
+            className="absolute left-2 right-2 top-[calc(100%+6px)] z-40 rounded-xl border border-surface-3 bg-white p-3 shadow-xl lg:left-3 lg:right-auto lg:w-80">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <div className="text-xs font-bold text-text-primary">Siguiente acción</div>
+                <div className="text-[9px] text-text-muted">Actualiza la tarea principal del canal</div>
+              </div>
+              <button onClick={() => setActionOpen(false)} className="p-1 text-text-muted hover:text-text-primary"><X size={14} /></button>
+            </div>
+            {actionError && <div className="mb-2 rounded-lg bg-red-50 px-2 py-1.5 text-[10px] text-red-600">{actionError}</div>}
+            <div className="space-y-2">
+              <select value={actionForm.type} disabled={summary.nextAction?.source && summary.nextAction.source !== 'interaction'}
+                onChange={(event) => setActionForm(form => ({ ...form, type: event.target.value }))}
+                className="w-full rounded-lg border border-surface-3 bg-white px-2.5 py-2 text-xs focus:border-brand-500 focus:outline-none disabled:bg-surface-1">
+                {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <input type="date" value={actionForm.date} onChange={(event) => setActionForm(form => ({ ...form, date: event.target.value }))}
+                  className="rounded-lg border border-surface-3 px-2.5 py-2 text-xs focus:border-brand-500 focus:outline-none" />
+                <input type="time" value={actionForm.time} disabled={summary.nextAction?.source === 'visit_followup'}
+                  onChange={(event) => setActionForm(form => ({ ...form, time: event.target.value }))}
+                  className="rounded-lg border border-surface-3 px-2.5 py-2 text-xs focus:border-brand-500 focus:outline-none disabled:bg-surface-1" />
+              </div>
+              <input type="text" value={actionForm.detail} onChange={(event) => setActionForm(form => ({ ...form, detail: event.target.value }))}
+                placeholder="Objetivo o detalle" className="w-full rounded-lg border border-surface-3 px-2.5 py-2 text-xs focus:border-brand-500 focus:outline-none" />
+              <div className="flex gap-2">
+                {summary.nextAction && (
+                  <button onClick={completeNextAction} disabled={savingAction}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-green-50 py-2 text-[10px] font-bold text-green-600 hover:bg-green-100 disabled:opacity-50">
+                    <Check size={12} /> Marcar realizada
+                  </button>
+                )}
+                <button onClick={saveNextAction} disabled={savingAction}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-brand-500 py-2 text-[10px] font-bold text-white hover:bg-brand-600 disabled:opacity-50">
+                  {savingAction ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex min-w-0 items-center gap-3 border-r border-surface-3 bg-amber-50/40 p-3.5">

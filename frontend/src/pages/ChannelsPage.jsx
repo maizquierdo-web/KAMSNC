@@ -11,6 +11,7 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelBusinessCasePrompt from '../components/ChannelBusinessCasePrompt';
 import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
+import ChannelCaesActiveDetails from '../components/ChannelCaesActiveDetails';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
@@ -394,6 +395,10 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
 
   const status = STATUS_CONFIG[channel.status] || STATUS_CONFIG.pendiente_contacto;
   const pipeline = PIPELINE_CONFIG[channel.pipeline_stage] || '-';
+  const isCaesChannel = classifications.some(classification =>
+    classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
+  ) || channel.channel_type?.trim().toLowerCase().includes('cae')
+    || Boolean(channel.potencial_caes);
 
   return (
     <div className={`grid items-start gap-4 ${copilotOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'}`}>
@@ -692,17 +697,16 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
 
       <ChannelBusinessCasePrompt channelId={channelId}
-        isCaes={classifications.some(classification =>
-          classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
-        ) || channel.channel_type?.trim().toLowerCase().includes('cae')
-          || Boolean(channel.potencial_caes)} />
+        isCaes={isCaesChannel} />
 
       {channel.pipeline_stage === 'onboarding' && (
         <ChannelOnboardingDetails channel={channel}
-          isCaes={classifications.some(classification =>
-            classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
-          ) || channel.channel_type?.trim().toLowerCase().includes('cae')
-            || Boolean(channel.potencial_caes)}
+          isCaes={isCaesChannel}
+          onUpdate={changes => setChannel(current => ({ ...current, ...changes }))} />
+      )}
+
+      {channel.status === 'activo' && isCaesChannel && (
+        <ChannelCaesActiveDetails channel={channel}
           onUpdate={changes => setChannel(current => ({ ...current, ...changes }))} />
       )}
 

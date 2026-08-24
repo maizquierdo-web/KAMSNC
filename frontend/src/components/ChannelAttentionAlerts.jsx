@@ -8,14 +8,15 @@ function scrollToBlock(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-export default function ChannelAttentionAlerts({ channelId, refreshKey = 0 }) {
+export default function ChannelAttentionAlerts({ channelId, refreshKey = 0, isCaes = false }) {
   const [alerts, setAlerts] = useState([]);
+  const [businessCaseMissing, setBusinessCaseMissing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!channelId) return;
     loadAlerts();
-  }, [channelId, refreshKey]);
+  }, [channelId, refreshKey, isCaes]);
 
   async function loadAlerts() {
     setLoading(true);
@@ -58,7 +59,9 @@ export default function ChannelAttentionAlerts({ channelId, refreshKey = 0 }) {
         title: lastActivity ? `Sin actividad desde hace ${inactiveDays} días` : 'Sin actividad registrada',
         detail: 'Conviene revisar la prioridad del canal.', target: 'channel-activity', action: 'Registrar',
       });
-      if (!businessCaseRes.data?.length) nextAlerts.push({
+      const missingBusinessCase = !businessCaseRes.data?.length;
+      setBusinessCaseMissing(missingBusinessCase);
+      if (missingBusinessCase && !isCaes) nextAlerts.push({
         key: 'business-case', Icon: FileWarning, color: 'blue',
         title: 'Business Case pendiente', detail: 'Todavía no hay ningún documento adjunto.',
         target: 'channel-business-case', action: 'Adjuntar',
@@ -67,6 +70,7 @@ export default function ChannelAttentionAlerts({ channelId, refreshKey = 0 }) {
     } catch (error) {
       console.error('No se pudieron calcular las alertas del canal', error);
       setAlerts([]);
+      setBusinessCaseMissing(false);
     } finally {
       setLoading(false);
     }
@@ -78,10 +82,26 @@ export default function ChannelAttentionAlerts({ channelId, refreshKey = 0 }) {
     </div>
   );
 
+  const optionalBusinessCase = isCaes && businessCaseMissing ? {
+    key: 'business-case-optional', Icon: FileWarning, color: 'blue',
+    title: 'Business Case opcional', detail: 'Funcionalidad en estudio para canales CAEs.',
+    target: 'channel-business-case', action: 'Añadir si procede',
+  } : null;
+
   if (alerts.length === 0) return (
-    <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
-      <div className="w-2 h-2 rounded-full bg-green-500" />
-      <span className="text-xs font-semibold text-green-700">Canal al día · No necesita atención inmediata</span>
+    <div className="mb-4 space-y-2">
+      <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+        <div className="w-2 h-2 rounded-full bg-green-500" />
+        <span className="text-xs font-semibold text-green-700">Canal al día · No necesita atención inmediata</span>
+      </div>
+      {optionalBusinessCase && (
+        <button onClick={() => scrollToBlock(optionalBusinessCase.target)}
+          className="flex w-full items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-left text-blue-600 transition-transform hover:-translate-y-0.5">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/70"><FileWarning size={17} /></div>
+          <div className="min-w-0 flex-1"><div className="text-xs font-bold">{optionalBusinessCase.title}</div><div className="mt-0.5 text-[10px] opacity-80">{optionalBusinessCase.detail}</div></div>
+          <span className="flex flex-shrink-0 items-center gap-1 text-[10px] font-bold">{optionalBusinessCase.action} <ArrowRight size={11} /></span>
+        </button>
+      )}
     </div>
   );
 
@@ -99,7 +119,7 @@ export default function ChannelAttentionAlerts({ channelId, refreshKey = 0 }) {
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">{alerts.length}</span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        {alerts.map(({ key, Icon, color, title, detail, target, action }) => (
+        {[...alerts, ...(optionalBusinessCase ? [optionalBusinessCase] : [])].map(({ key, Icon, color, title, detail, target, action }) => (
           <button key={key} onClick={() => scrollToBlock(target)}
             className={`flex items-center gap-3 p-3 border rounded-xl text-left transition-transform hover:-translate-y-0.5 ${styles[color]}`}>
             <div className="w-9 h-9 rounded-lg bg-white/70 flex items-center justify-center flex-shrink-0"><Icon size={17} /></div>

@@ -681,7 +681,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
 
       <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
-      }} />
+      }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
 
       <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey} />
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { CheckInButton } from '../components/CheckInButton';
-import { Loader2, MapPin, Phone, Mail, MessageCircle, Users, Linkedin, Calendar, Check, AlertTriangle, ArrowRight, Target, Activity, CircleAlert, Clock } from 'lucide-react';
+import { Loader2, MapPin, Phone, Mail, MessageCircle, Users, Linkedin, Calendar, Check, AlertTriangle, ArrowRight, Target, Activity, CircleAlert, Clock, X } from 'lucide-react';
 
 const TYPE_CONFIG = {
   visit: { label: 'Visita', icon: MapPin, color: '#E87A1E', bg: 'bg-orange-50' },
@@ -28,15 +28,15 @@ function daysSince(value) {
   return Math.max(0, Math.floor((now - then) / 86400000));
 }
 
-function SummaryCard({ value, label, detail, tone = 'default', icon: Icon }) {
+function SummaryCard({ value, label, detail, tone = 'default', icon: Icon, onClick }) {
   const tones = {
     default: 'border-surface-3 bg-surface-1 text-text-primary', blue: 'border-blue-200 bg-blue-50/70 text-blue-700',
     amber: 'border-amber-200 bg-amber-50/70 text-amber-700', red: 'border-red-200 bg-red-50/70 text-red-700',
   };
-  return <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+  return <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-400/40 ${tones[tone]}`}>
     <div className="flex items-start justify-between"><div className="text-2xl font-extrabold leading-none">{value}</div><Icon size={18} className="opacity-70" /></div>
-    <div className="mt-2 text-xs font-bold text-text-primary">{label}</div><div className="mt-1 text-[10px] text-text-secondary">{detail}</div>
-  </div>;
+    <div className="mt-2 text-xs font-bold text-text-primary">{label}</div><div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-text-secondary"><span>{detail}</span><span className="font-bold">Ver detalle →</span></div>
+  </button>;
 }
 
 export default function HomePage() {
@@ -47,6 +47,8 @@ export default function HomePage() {
   const [completedToday, setCompletedToday] = useState(0);
   const [attentionItems, setAttentionItems] = useState([]);
   const [stats, setStats] = useState({ today: 0, withoutNext: 0, inactive: 0, overdue: 0 });
+  const [detailGroups, setDetailGroups] = useState({ today: [], withoutNext: [], inactive: [], overdue: [] });
+  const [selectedDetail, setSelectedDetail] = useState(null);
   const mountedRef = useRef(true);
   const openChannel = id => { if (id) navigate(`/channels?detail=${id}`); };
 
@@ -94,6 +96,12 @@ export default function HomePage() {
       setTodayActions(pendingToday); setCompletedToday(todayRows.filter(item => item.status === 'completed').length);
       setAttentionItems(attention.slice(0, 12));
       setStats({ today: todayRows.length, withoutNext: withoutNext.length, inactive: inactive.length, overdue: overdue.length });
+      setDetailGroups({
+        today: todayRows.map(item => ({ id: item.activity_key, channelId: item.channel_id, channelName: channelMap.get(item.channel_id)?.name || 'Canal', title: TYPE_CONFIG[item.activity_type]?.label || 'Acción', detail: `${item.scheduled_time?.slice(0, 5) || '--:--'} · ${item.status === 'completed' ? 'Completada' : item.status === 'in_progress' ? 'En curso' : 'Pendiente'}` })),
+        withoutNext: withoutNext.map(channel => ({ id: channel.id, channelId: channel.id, channelName: channel.name, title: 'Sin siguiente acción', detail: 'No tiene un próximo contacto planificado.' })),
+        inactive: inactive.map(channel => ({ id: channel.id, channelId: channel.id, channelName: channel.name, title: 'Sin actividad reciente', detail: `${daysSince(lastByChannel.get(channel.id) || channel.updated_at)} días sin actividad registrada.` })),
+        overdue: overdue.map(item => ({ id: item.activity_key, channelId: item.channel_id, channelName: channelMap.get(item.channel_id)?.name || 'Canal', title: TYPE_CONFIG[item.activity_type]?.label || 'Acción vencida', detail: `Vencida desde ${item.scheduled_date}` })),
+      });
     } catch (error) { console.error('Error cargando Mi día:', error); }
     finally { if (mountedRef.current) setLoading(false); }
   }
@@ -128,10 +136,10 @@ export default function HomePage() {
     <section>
       <div className="mb-3"><h2 className="text-lg font-extrabold">Lo importante, hoy</h2><p className="text-[11px] text-text-secondary">El CRM reúne lo que requiere acción, sin reporting adicional.</p></div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-        <SummaryCard value={stats.today} label="Acciones de hoy" detail={`${completedToday} completadas`} tone="blue" icon={Target} />
-        <SummaryCard value={stats.withoutNext} label="Sin siguiente acción" detail="Canales activos" tone="amber" icon={Calendar} />
-        <SummaryCard value={stats.inactive} label="Sin actividad +15 días" detail="Revisar prioridad" tone="amber" icon={Activity} />
-        <SummaryCard value={stats.overdue} label="Acciones vencidas" detail="Requieren atención" tone="red" icon={CircleAlert} />
+        <SummaryCard value={stats.today} label="Acciones de hoy" detail={`${completedToday} completadas`} tone="blue" icon={Target} onClick={() => setSelectedDetail('today')} />
+        <SummaryCard value={stats.withoutNext} label="Sin siguiente acción" detail="Canales activos" tone="amber" icon={Calendar} onClick={() => setSelectedDetail('withoutNext')} />
+        <SummaryCard value={stats.inactive} label="Sin actividad +15 días" detail="Revisar prioridad" tone="amber" icon={Activity} onClick={() => setSelectedDetail('inactive')} />
+        <SummaryCard value={stats.overdue} label="Acciones vencidas" detail="Requieren atención" tone="red" icon={CircleAlert} onClick={() => setSelectedDetail('overdue')} />
       </div>
     </section>
     <CheckInButton />
@@ -148,5 +156,14 @@ export default function HomePage() {
       </section>
     </div>
     {stats.overdue > 0 && <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-[10px] text-amber-800"><AlertTriangle size={14} />Las acciones vencidas permanecen visibles hasta completarlas o reprogramarlas en la Agenda.</div>}
+    {selectedDetail && <div className="fixed inset-0 z-50 bg-black/25" onClick={() => setSelectedDetail(null)}>
+      <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-surface-0 border-l border-surface-3 shadow-2xl flex flex-col" onClick={event => event.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3"><div><p className="text-[10px] font-bold uppercase tracking-wider text-brand-500">Detalle de Mi día</p><h2 className="text-lg font-extrabold">{{ today: 'Acciones de hoy', withoutNext: 'Canales sin siguiente acción', inactive: 'Canales sin actividad +15 días', overdue: 'Acciones vencidas' }[selectedDetail]}</h2></div><button onClick={() => setSelectedDetail(null)} className="p-2 rounded-lg hover:bg-surface-2"><X size={19} /></button></div>
+        <div className="flex-1 overflow-y-auto divide-y divide-surface-3">
+          {detailGroups[selectedDetail].length === 0 ? <div className="py-16 text-center text-sm text-text-secondary">No hay registros en este apartado.</div> : detailGroups[selectedDetail].map(item => <button key={item.id} onClick={() => openChannel(item.channelId)} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-surface-1 transition-colors"><span className={`w-2 h-2 rounded-full ${selectedDetail === 'overdue' ? 'bg-red-500' : selectedDetail === 'today' ? 'bg-blue-500' : 'bg-amber-500'}`} /><span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{item.channelName}</span><span className="block text-[11px] text-text-secondary">{item.title} · {item.detail}</span></span><ArrowRight size={15} className="text-text-muted" /></button>)}
+        </div>
+        <div className="p-4 border-t border-surface-3"><button onClick={() => navigate('/calendar')} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold">Abrir Agenda completa</button></div>
+      </aside>
+    </div>}
   </div>;
 }

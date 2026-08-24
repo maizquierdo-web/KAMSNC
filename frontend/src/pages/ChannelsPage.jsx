@@ -683,7 +683,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         setChannel(prev => ({ ...prev, assigned_to: kamId }));
       }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
 
-      <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey} />
+      <ChannelAttentionAlerts channelId={channelId} refreshKey={activityRefreshKey}
+        isCaes={classifications.some(classification => classification.canal === 'CAEs')} />
 
       <div className="mb-4">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />

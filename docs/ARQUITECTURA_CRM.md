@@ -1,6 +1,6 @@
 # CRM para KAMs — Documentación de arquitectura y traspaso
 
-> Última actualización: 20 de julio de 2026.
+> Última actualización: 26 de agosto de 2026.
 > Este documento describe el estado **real** del sistema en producción, verificado directamente contra el código de los repositorios y la base de datos de Supabase — no es una memoria de diseño original, sino un inventario actual.
 
 ---
@@ -173,7 +173,7 @@ El módulo de administración de usuarios (`UserAdminPage.jsx`) centraliza toda 
 
 **Alta de usuarios (acción `invite_user`):** el administrador crea al usuario con email, nombre, rol, zona, manager y una **contraseña temporal**. El sistema usa `auth.admin.createUser()` con `email_confirm: true` (sin enviar email de invitación, evitando la dependencia de SMTP y el problema conocido de redirección a localhost). El administrador comunica la contraseña al usuario por un canal seguro. El trigger `handle_new_user()` crea automáticamente la fila en `profiles`.
 
-**Cambio de contraseña (acción `reset_password`):** desde el formulario de edición de cualquier usuario (lápiz → 🔑 Cambiar contraseña), el administrador puede establecer una nueva contraseña. Usa `auth.admin.updateUserById()`. No se permite resetear la propia contraseña por esta vía (para eso existe "¿Olvidaste tu contraseña?" en la pantalla de login).
+**Cambio de contraseña (acción `reset_password`):** desde el formulario de edición de cualquier usuario (lápiz → 🔑 Cambiar contraseña), el administrador puede establecer una nueva contraseña. Usa `auth.admin.updateUserById()`. No existe "recuperar contraseña por email" — el envío de emails no funciona sin SMTP custom configurado (sección 7.1), así que la pantalla de login muestra "¿Olvidaste tu contraseña? Contacta con tu administrador." en vez de un enlace de recuperación. El admin resetea la contraseña desde el módulo de administración.
 
 **Reseteo de MFA (acción `reset_mfa`):** desde el mismo formulario de edición (lápiz → 📱 Resetear MFA), el administrador puede borrar los factores TOTP del usuario para forzar un re-enrollment. Usa `auth.admin.mfa.deleteFactor()`. Necesario cuando un usuario cambia de móvil o pierde acceso a su app autenticadora.
 

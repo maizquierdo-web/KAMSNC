@@ -20,10 +20,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // ─── Reset password state ──────────────────────────────────────────────────
-  const [resetMode, setResetMode] = useState(false);
-  const [resetSent, setResetSent] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
+  // ─── Reset password state (deshabilitado — sin SMTP configurado) ─────────
+  // Si se necesita resetear una contraseña, el admin lo hace desde el módulo
+  // de administración de usuarios (🔑 Cambiar contraseña).
 
   // ─── MFA state ─────────────────────────────────────────────────────────────
   // mfaStep: null (login normal), 'enroll' (mostrar QR), 'verify' (pedir código)
@@ -99,24 +98,6 @@ export default function LoginPage() {
       setMfaLoading(false);
     }
   }
-
-  // ─── Reset password ────────────────────────────────────────────────────────
-  const handleResetPassword = async () => {
-    if (!email) { setError('Introduce tu email para recuperar la contraseña'); return; }
-    setResetLoading(true);
-    setError('');
-    try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + '/login',
-      });
-      if (resetError) throw resetError;
-      setResetSent(true);
-    } catch (err) {
-      setError(err.message || 'Error al enviar el email de recuperación');
-    } finally {
-      setResetLoading(false);
-    }
-  };
 
   // ─── Cancelar MFA y volver al login ────────────────────────────────────────
   function cancelMfa() {
@@ -279,49 +260,6 @@ export default function LoginPage() {
       );
     }
 
-    // ===== RESET PASSWORD =====
-    if (resetMode) {
-      return (
-        <>
-          <h2 className="text-lg font-bold text-text-primary mb-2">Recuperar contraseña</h2>
-          {resetSent ? (
-            <div className="py-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-xl">✉️</span>
-              </div>
-              <p className="text-sm text-text-primary text-center font-semibold mb-1">Email enviado</p>
-              <p className="text-xs text-text-secondary text-center mb-4">
-                Revisa tu bandeja de entrada en <strong>{email}</strong> y sigue las instrucciones.
-              </p>
-              <button onClick={() => { setResetMode(false); setResetSent(false); }}
-                className="w-full py-3 border border-surface-3 text-text-secondary font-semibold rounded-xl text-sm hover:bg-surface-2 transition-colors">
-                Volver al login
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-text-secondary mb-4">Introduce tu email y te enviaremos un enlace para restablecer tu contraseña.</p>
-              {error && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 text-sm text-red-600">{error}</div>}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Email</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@empresa.com" autoComplete="email"
-                    className="w-full px-4 py-3 bg-white border border-surface-3 rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors" />
-                </div>
-                <button onClick={handleResetPassword} disabled={resetLoading}
-                  className="w-full py-3.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
-                  {resetLoading ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enviando...</> : 'Enviar enlace de recuperación'}
-                </button>
-                <button onClick={() => { setResetMode(false); setError(''); }}
-                  className="w-full py-2 text-text-secondary text-sm font-semibold hover:text-text-primary transition-colors">← Volver al login</button>
-              </div>
-            </>
-          )}
-        </>
-      );
-    }
-
     // ===== LOGIN NORMAL =====
     return (
       <>
@@ -347,10 +285,9 @@ export default function LoginPage() {
             </div>
           </div>
           <div className="flex justify-end">
-            <button type="button" onClick={() => { setResetMode(true); setError(''); }}
-              className="text-xs text-brand-500 font-semibold hover:text-brand-600 transition-colors">
-              ¿Olvidaste tu contraseña?
-            </button>
+            <span className="text-[11px] text-text-muted">
+              ¿Olvidaste tu contraseña? Contacta con tu administrador.
+            </span>
           </div>
           <button onClick={handleSubmit} disabled={loading}
             className="w-full py-3.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm shadow-brand-500/20">
@@ -421,7 +358,7 @@ export default function LoginPage() {
             {renderFormContent()}
           </div>
 
-          {!mfaStep && !resetMode && (
+          {!mfaStep && (
             <p className="text-center text-text-muted text-xs mt-6">¿No tienes cuenta? <a href="mailto:kamapp.reporte@gmail.com" className="text-brand-500 font-semibold hover:text-brand-600">Contacta con el administrador</a>.</p>
           )}
 

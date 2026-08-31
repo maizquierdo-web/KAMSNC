@@ -69,7 +69,7 @@ export default function HomePage() {
       const [feedRes, channelsRes, alertsRes] = await Promise.all([
         supabase.from('channel_activity_feed').select('*').eq('user_id', user.id).order('scheduled_date').order('scheduled_time'),
         supabase.from('channels').select('id, name, pipeline_stage, status, updated_at, pipeline_stage_changed_at, onboarding_status, onboarding_status_changed_at').eq('assigned_to', user.id),
-        supabase.from('alerts').select('id, channel_id, title, detail, priority, due_date').eq('user_id', user.id).eq('is_dismissed', false).order('created_at', { ascending: false }).limit(10),
+        supabase.from('alerts').select('id, channel_id, alert_type, title, detail, priority, due_date').eq('user_id', user.id).eq('is_dismissed', false).order('created_at', { ascending: false }).limit(10),
       ]);
       if (feedRes.error) throw feedRes.error;
       if (channelsRes.error) throw channelsRes.error;
@@ -97,18 +97,23 @@ export default function HomePage() {
       const active = channels.filter(channel => !['discarded', 'closed', 'inactive'].includes(channel.status));
       const futureIds = new Set(feed.filter(item => item.scheduled_date >= today && ['planned', 'in_progress'].includes(item.status)).map(item => item.channel_id));
       const withoutNext = active.filter(channel => !futureIds.has(channel.id));
+      const channelsWithPendingVisit = new Set(feed
+        .filter(item => item.source_table === 'planned_visits'
+          && (item.status === 'in_progress' || (item.status === 'planned' && item.scheduled_date >= today)))
+        .map(item => item.channel_id));
       const lastByChannel = new Map();
       feed.filter(item => item.occurred_at).forEach(item => {
         const current = lastByChannel.get(item.channel_id);
         if (!current || new Date(item.occurred_at) > new Date(current)) lastByChannel.set(item.channel_id, item.occurred_at);
       });
-      const inactive = active.filter(channel => (daysSince(lastByChannel.get(channel.id) || channel.updated_at) || 0) > 15);
+      const inactive = active.filter(channel => !channelsWithPendingVisit.has(channel.id)
+        && (daysSince(lastByChannel.get(channel.id) || channel.updated_at) || 0) > 15);
       const overdue = feed.filter(item => item.status === 'overdue');
       const attention = []; const representedChannels = new Set();
       overdue.forEach(item => { if (representedChannels.has(item.channel_id)) return; representedChannels.add(item.channel_id); attention.push({ key: `overdue:${item.activity_key}`, severity: 'high', channelId: item.channel_id, channelName: channelMap.get(item.channel_id)?.name || 'Canal', title: 'Acción vencida', detail: `${TYPE_CONFIG[item.activity_type]?.label || 'Seguimiento'} · ${item.scheduled_date}` }); });
       withoutNext.forEach(channel => { if (representedChannels.has(channel.id)) return; representedChannels.add(channel.id); attention.push({ key: `next:${channel.id}`, severity: 'medium', channelId: channel.id, channelName: channel.name, title: 'Sin siguiente acción', detail: 'Conviene planificar el próximo contacto.' }); });
       inactive.forEach(channel => { if (representedChannels.has(channel.id)) return; representedChannels.add(channel.id); attention.push({ key: `inactive:${channel.id}`, severity: 'medium', channelId: channel.id, channelName: channel.name, title: 'Sin actividad reciente', detail: `${daysSince(lastByChannel.get(channel.id) || channel.updated_at)} días sin actividad registrada.` }); });
-      (alertsRes.data || []).forEach(alert => { if (alert.channel_id && representedChannels.has(alert.channel_id)) return; if (alert.channel_id) representedChannels.add(alert.channel_id); attention.push({ key: `alert:${alert.id}`, alertId: alert.id, severity: alert.priority === 'high' ? 'high' : 'low', channelId: alert.channel_id, channelName: alert.title, title: alert.detail || 'Aviso pendiente', detail: alert.due_date ? `Fecha: ${alert.due_date}` : 'Requiere revisión.' }); });
+      (alertsRes.data || []).forEach(alert => { if (alert.alert_type === 'channel_inactive' && channelsWithPendingVisit.has(alert.channel_id)) return; if (alert.channel_id && representedChannels.has(alert.channel_id)) return; if (alert.channel_id) representedChannels.add(alert.channel_id); attention.push({ key: `alert:${alert.id}`, alertId: alert.id, severity: alert.priority === 'high' ? 'high' : 'low', channelId: alert.channel_id, channelName: alert.title, title: alert.detail || 'Aviso pendiente', detail: alert.due_date ? `Fecha: ${alert.due_date}` : 'Requiere revisión.' }); });
 
       if (!mountedRef.current) return;
       setTodayActions(pendingToday); setCompletedToday(todayRows.filter(item => item.status === 'completed').length);

@@ -376,7 +376,7 @@ function RescheduleActionModal({ event, onSave, onClose }) {
 }
 
 // ============ EVENT CARD ============
-function EventCard({ event, onDelete, onComplete, onReschedule }) {
+function EventCard({ event, onDelete, onComplete, onReschedule, canModify }) {
   const time = event.planned_time ? event.planned_time.slice(0, 5) : '--:--';
   const cfg = TYPE_CONFIG[event._type] || TYPE_CONFIG.other;
   const Icon = cfg.icon;
@@ -406,7 +406,7 @@ function EventCard({ event, onDelete, onComplete, onReschedule }) {
       <div className="flex items-center gap-1 flex-shrink-0">
         {isCompleted ? (
           <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-green-500/20 text-green-400">✓</span>
-        ) : (
+        ) : canModify ? (
           <>
             <button onClick={(e) => { e.stopPropagation(); onReschedule?.(event); }}
               className="px-2 py-1.5 bg-surface-1 hover:bg-surface-2 text-text-secondary border border-surface-3 rounded-lg text-[10px] font-semibold transition-colors flex items-center gap-1">
@@ -419,6 +419,10 @@ function EventCard({ event, onDelete, onComplete, onReschedule }) {
             <button onClick={(e) => { e.stopPropagation(); onDelete?.(event); }}
               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-red-400 transition-colors"><X size={14} /></button>
           </>
+        ) : (
+          <span className="text-[9px] font-semibold px-2 py-1 rounded-lg bg-surface-2 text-text-muted">
+            Solo lectura
+          </span>
         )}
       </div>
     </div>
@@ -781,19 +785,31 @@ export default function CalendarPage() {
 
   async function handleDeleteEvent(event) {
     try {
+      if (event?._userId !== user.id) throw new Error('Solo el KAM responsable puede modificar esta actividad.');
+      let deleteQuery;
       if (event._source === 'planned_visit') {
-        await supabase.from('planned_visits').delete().eq('id', event._sourceId);
+        deleteQuery = supabase.from('planned_visits').delete().eq('id', event._sourceId);
       } else if (event._source === 'visit_followup') {
-        await supabase.from('visits').update({ next_action_date: null, next_steps: null }).eq('id', event._sourceId);
+        deleteQuery = supabase.from('visits').update({ next_action_date: null, next_steps: null }).eq('id', event._sourceId);
       } else {
-        await supabase.from('channel_interactions').delete().eq('id', event._sourceId);
+        deleteQuery = supabase.from('channel_interactions').delete().eq('id', event._sourceId);
       }
-      loadWeekData();
+      const { data, error } = await deleteQuery.select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('La actividad no se eliminó. Comprueba que te pertenece e inténtalo de nuevo.');
+      await loadWeekData();
       setToast({ message: 'Eliminada', type: 'success' });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      setToast({ message: 'Error: ' + err.message, type: 'error' });
+    }
   }
 
   async function handleCompleteEvent(event) {
+    if (event?._userId !== user.id) {
+      setToast({ message: 'Solo el KAM responsable puede completar esta actividad.', type: 'error' });
+      return;
+    }
     setEventToComplete(event);
   }
 
@@ -801,6 +817,7 @@ export default function CalendarPage() {
     const event = eventToComplete;
     if (!event) return;
     try {
+      if (event._userId !== user.id) throw new Error('Solo el KAM responsable puede modificar esta actividad.');
       const completedNotes = [event.notes, notes].filter(Boolean).join('\n\nResultado: ');
       let completionQuery;
       if (event._source === 'planned_visit') {
@@ -821,8 +838,9 @@ export default function CalendarPage() {
           created_at: new Date().toISOString(),
         }).eq('id', event._sourceId);
       }
-      const { error: completeError } = await completionQuery;
+      const { data: completedRows, error: completeError } = await completionQuery.select('id');
       if (completeError) throw completeError;
+      if (!completedRows?.length) throw new Error('La actividad no se completó. Comprueba que te pertenece e inténtalo de nuevo.');
 
       if (nextAction) {
         const { error: nextError } = await supabase.from('channel_interactions').insert({
@@ -839,7 +857,7 @@ export default function CalendarPage() {
       }
 
       setEventToComplete(null);
-      loadWeekData();
+      await loadWeekData();
       setToast({ message: nextAction ? '✓ Completada y siguiente acción planificada' : '✓ Acción completada', type: 'success' });
     } catch (err) {
       console.error(err);
@@ -851,6 +869,7 @@ export default function CalendarPage() {
     const event = eventToReschedule;
     if (!event) return;
     try {
+      if (event._userId !== user.id) throw new Error('Solo el KAM responsable puede modificar esta actividad.');
       let updateQuery;
       if (event._source === 'visit_followup') {
         updateQuery = supabase.from('visits').update({
@@ -861,8 +880,9 @@ export default function CalendarPage() {
         const table = event._source === 'planned_visit' ? 'planned_visits' : 'channel_interactions';
         updateQuery = supabase.from(table).update(changes).eq('id', event._sourceId);
       }
-      const { error } = await updateQuery;
+      const { data: updatedRows, error } = await updateQuery.select('id');
       if (error) throw error;
+      if (!updatedRows?.length) throw new Error('La actividad no se reprogramó. Comprueba que te pertenece e inténtalo de nuevo.');
       setEventToReschedule(null);
       await loadWeekData();
       setToast({ message: '✓ Acción reprogramada', type: 'success' });
@@ -1042,7 +1062,7 @@ const visibleChannels = channels.filter(ch => {
                   {new Date(`${event.planned_date}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </div>
                 <EventCard event={event} onDelete={handleDeleteEvent} onComplete={handleCompleteEvent}
-                  onReschedule={setEventToReschedule} />
+                  onReschedule={setEventToReschedule} canModify={event._userId === user.id} />
               </div>
             ))}
           </div>
@@ -1100,7 +1120,8 @@ const visibleChannels = channels.filter(ch => {
             <div className="space-y-2">
               {dayEvents.map(event => (
                 <EventCard key={`${event._source}-${event._sourceId}`} event={event}
-                  onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule} />
+                  onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule}
+                  canModify={event._userId === user.id} />
               ))}
               <button onClick={() => setShowNewModal(true)}
                 className="w-full py-2.5 border border-dashed border-surface-3 hover:border-blue-300 hover:bg-blue-50/50 rounded-xl text-xs font-semibold text-text-muted hover:text-blue-500 transition-colors">
@@ -1143,7 +1164,8 @@ const visibleChannels = channels.filter(ch => {
                       <div className="space-y-2">
                         {events.map(event => (
                           <EventCard key={`${event._source}-${event._sourceId}`} event={event}
-                            onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule} />
+                            onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule}
+                            canModify={event._userId === user.id} />
                         ))}
                       </div>
                     )}

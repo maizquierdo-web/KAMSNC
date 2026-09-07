@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
+import { ACTIVITY_VISUAL } from '../lib/crmConstants';
 import {
   Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, X, Check,
   Clock, MapPin, Building2, CalendarDays, Mail, Phone,
@@ -63,14 +64,14 @@ function getSummaryPeriodRange(period, weekStart, customFrom, customTo) {
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const TYPE_CONFIG = {
-  visit: { label: 'Visita', icon: MapPin, color: '#E87A1E', bg: '#FEF3E8', borderColor: '#E87A1E' },
-  call: { label: 'Llamada', icon: Phone, color: '#3b82f6', bg: '#eff6ff', borderColor: '#3b82f6' },
-  email: { label: 'Email', icon: Mail, color: '#8b5cf6', bg: '#f3eeff', borderColor: '#8b5cf6' },
-  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: '#16a34a', bg: '#e6f5ed', borderColor: '#16a34a' },
-  meeting: { label: 'Reunión', icon: Users, color: '#E87A1E', bg: '#FEF3E8', borderColor: '#E87A1E' },
-  linkedin: { label: 'LinkedIn', icon: Linkedin, color: '#0077b5', bg: '#e8f4fd', borderColor: '#0077b5' },
-  follow_up: { label: 'Seguimiento', icon: Clock, color: '#0f766e', bg: '#ecfdf5', borderColor: '#0f766e' },
-  other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: '#f0f0f4', borderColor: '#5a6078' },
+  visit: { label: 'Visita', icon: MapPin, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  call: { label: 'Llamada', icon: Phone, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  email: { label: 'Email', icon: Mail, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  meeting: { label: 'Reunión', icon: Users, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  linkedin: { label: 'LinkedIn', icon: Linkedin, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  follow_up: { label: 'Seguimiento', icon: Clock, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  other: { label: 'Otro', icon: Calendar, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
 };
 
 const ACTION_TYPES = [
@@ -182,7 +183,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
 
         <div className="p-4 border-t border-surface-3">
           <button onClick={handleSave} disabled={!selectedChannel || saving}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+            className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Calendar size={16} />}
             Planificar {TYPE_CONFIG[actionType]?.label.toLowerCase() || 'acción'}
           </button>
@@ -365,7 +366,7 @@ function RescheduleActionModal({ event, onSave, onClose }) {
 
         <div className="p-4 border-t border-surface-3">
           <button onClick={handleSave} disabled={!date || saving}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
+            className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Clock size={16} />}
             Guardar nueva fecha
           </button>
@@ -983,7 +984,7 @@ const visibleChannels = channels.filter(ch => {
   <option value="activity_change">Cambios de actividad</option>
 </select>
         <button onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold rounded-lg transition-colors">
+          className="flex items-center gap-1.5 px-3 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold rounded-lg transition-colors">
           <Plus size={14} /> Planificar
         </button>
       </div>
@@ -1000,8 +1001,8 @@ const visibleChannels = channels.filter(ch => {
           <div className={`text-xl font-extrabold ${priorityCounts.overdue > 0 ? 'text-red-600' : 'text-text-muted'}`}>{priorityCounts.overdue}</div>
           <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Vencidas</div>
         </div>
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3">
-          <div className="text-xl font-extrabold text-blue-600">{priorityCounts.today}</div>
+        <div className="rounded-xl border border-navy-100 bg-navy-50 px-3 py-3">
+          <div className="text-xl font-extrabold text-navy-600">{priorityCounts.today}</div>
           <div className="text-[10px] font-bold uppercase tracking-wider text-text-secondary">Hoy</div>
         </div>
         <div className="rounded-xl border border-surface-3 bg-surface-1 px-3 py-3">
@@ -1114,7 +1115,7 @@ const visibleChannels = channels.filter(ch => {
               <CalendarDays size={28} className="mx-auto mb-2 text-text-muted" />
               <p className="text-sm text-text-secondary">Sin acciones para este día</p>
               <button onClick={() => setShowNewModal(true)}
-                className="mt-3 text-xs font-semibold text-blue-500 hover:text-blue-400 transition-colors">+ Planificar acción</button>
+                className="mt-3 text-xs font-semibold text-brand-500 hover:text-brand-600 transition-colors">+ Planificar acción</button>
             </div>
           ) : (
             <div className="space-y-2">
@@ -1124,7 +1125,7 @@ const visibleChannels = channels.filter(ch => {
                   canModify={event._userId === user.id} />
               ))}
               <button onClick={() => setShowNewModal(true)}
-                className="w-full py-2.5 border border-dashed border-surface-3 hover:border-blue-300 hover:bg-blue-50/50 rounded-xl text-xs font-semibold text-text-muted hover:text-blue-500 transition-colors">
+                className="w-full py-2.5 border border-dashed border-surface-3 hover:border-brand-300 hover:bg-brand-50/50 rounded-xl text-xs font-semibold text-text-muted hover:text-brand-500 transition-colors">
                 + Planificar otra acción
               </button>
             </div>
@@ -1226,7 +1227,7 @@ const visibleChannels = channels.filter(ch => {
         ) : (
           <>
             <div className="grid grid-cols-5 divide-x divide-surface-3 border-b border-surface-3 bg-surface-0">
-              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-blue-600">{summaryTotals.planned}</div><div className="text-[8px] font-bold uppercase text-text-muted">Planificadas</div></div>
+              <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-navy-600">{summaryTotals.planned}</div><div className="text-[8px] font-bold uppercase text-text-muted">Planificadas</div></div>
               <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-green-600">{summaryTotals.completed}</div><div className="text-[8px] font-bold uppercase text-text-muted">Realizadas</div></div>
               <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-amber-600">{summaryTotals.pending}</div><div className="text-[8px] font-bold uppercase text-text-muted">Pendientes</div></div>
               <div className="px-2 py-3 text-center"><div className="text-lg font-extrabold text-red-600">{summaryTotals.overdue}</div><div className="text-[8px] font-bold uppercase text-text-muted">Vencidas</div></div>
@@ -1244,7 +1245,7 @@ const visibleChannels = channels.filter(ch => {
                       <div className="text-[9px] text-text-muted">{row.planned ? Math.round((row.completed / row.planned) * 100) : 0}% ejecutado</div>
                     </div>
                     <div className="grid grid-cols-4 gap-2 flex-1 text-center">
-                      <div><span className="text-xs font-bold text-blue-600">{row.planned}</span><span className="block text-[8px] text-text-muted">Planif.</span></div>
+                      <div><span className="text-xs font-bold text-navy-600">{row.planned}</span><span className="block text-[8px] text-text-muted">Planif.</span></div>
                       <div><span className="text-xs font-bold text-green-600">{row.completed}</span><span className="block text-[8px] text-text-muted">Realiz.</span></div>
                       <div><span className="text-xs font-bold text-amber-600">{row.pending}</span><span className="block text-[8px] text-text-muted">Pend.</span></div>
                       <div><span className="text-xs font-bold text-red-600">{row.overdue}</span><span className="block text-[8px] text-text-muted">Venc.</span></div>

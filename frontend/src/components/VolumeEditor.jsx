@@ -76,18 +76,18 @@ export default function VolumeEditor({ channel, onChannelUpdate }) {
         {/* Unit selector */}
         <div>
           <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tipo de volumen</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-1.5">
             {VOLUME_UNITS.map(u => (
               <button key={u.key} type="button" onClick={() => setUnit(u.key)}
-                className="px-2 py-2 rounded-xl text-center transition-all"
+                className="min-h-[42px] px-1.5 py-1 rounded-lg text-center transition-all"
                 style={{
                   background: unit === u.key ? u.bg : '#f7f8fa',
                   border: `1.5px solid ${unit === u.key ? u.color : '#dde1e8'}`,
                 }}>
-                <div className="text-[11px] font-bold" style={{ color: unit === u.key ? u.color : '#8b90a0' }}>
+                <div className="text-[10px] font-bold leading-tight" style={{ color: unit === u.key ? u.color : '#8b90a0' }}>
                   {u.label}
                 </div>
-                <div className="text-[9px]" style={{ color: unit === u.key ? u.color : '#c5cbd6' }}>
+                <div className="text-[8px] leading-tight mt-0.5" style={{ color: unit === u.key ? u.color : '#c5cbd6' }}>
                   {u.unit}
                 </div>
               </button>

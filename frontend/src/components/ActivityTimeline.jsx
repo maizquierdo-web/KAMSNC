@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
+import { ACTIVITY_VISUAL } from '../lib/crmConstants';
 import {
   Phone, Mail, MessageCircle, Linkedin, Users, Calendar,
   Loader2, Save, ChevronDown, Plus, X, Check,
@@ -8,14 +9,14 @@ import {
 } from 'lucide-react';
 
 const TYPE_CONFIG = {
-  visit: { label: 'Visita', icon: MapPin, color: '#E87A1E', bg: 'bg-[#FEF3E8]' },
-  call: { label: 'Llamada', icon: Phone, color: '#3b82f6', bg: 'bg-blue-50' },
-  email: { label: 'Email', icon: Mail, color: '#8b5cf6', bg: 'bg-purple-50' },
-  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: '#16a34a', bg: 'bg-green-50' },
-  meeting: { label: 'Reunión', icon: Users, color: '#E87A1E', bg: 'bg-[#FEF3E8]' },
-  linkedin: { label: 'LinkedIn', icon: Linkedin, color: '#0077b5', bg: 'bg-blue-50' },
-  note: { label: 'Nota', icon: StickyNote, color: '#5a6078', bg: 'bg-gray-50' },
-  other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: 'bg-gray-50' },
+  visit: { label: 'Visita', icon: MapPin, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  call: { label: 'Llamada', icon: Phone, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  email: { label: 'Email', icon: Mail, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  meeting: { label: 'Reunión', icon: Users, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  linkedin: { label: 'LinkedIn', icon: Linkedin, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  note: { label: 'Nota', icon: StickyNote, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  other: { label: 'Otro', icon: Calendar, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
 };
 
 const RESULT_CONFIG = {
@@ -25,7 +26,7 @@ const RESULT_CONFIG = {
   connected: { label: 'Contactado', color: 'text-green-600', bg: 'bg-green-50' },
   no_answer: { label: 'No contesta', color: 'text-amber-600', bg: 'bg-amber-50' },
   voicemail: { label: 'Buzón', color: 'text-amber-600', bg: 'bg-amber-50' },
-  callback: { label: 'Devolver', color: 'text-blue-600', bg: 'bg-blue-50' },
+  callback: { label: 'Devolver', color: 'text-navy-600', bg: 'bg-navy-50' },
 };
 
 const INTERACTION_TYPES = [
@@ -282,7 +283,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
               )}
             </div>
             <button onClick={() => { setFormMode('plan'); setShowAddMenu(false); setShowFilterMenu(false); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-colors">
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-xs font-semibold transition-colors">
               <Calendar size={12} /> Planificar
             </button>
           </div>
@@ -293,16 +294,16 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="mr-0.5 text-[9px] font-bold uppercase tracking-wider text-text-muted">Contactar</span>
             {phoneNumber && (
-              <a href={`tel:${phoneNumber}`} className="flex items-center gap-1 px-2 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-[10px] font-semibold transition-colors">
+              <a href={`tel:${phoneNumber}`} className="flex items-center gap-1 px-2 py-1.5 text-text-secondary hover:bg-surface-2 rounded-lg text-[10px] font-semibold transition-colors">
                 <Phone size={12} /> Llamar</a>
             )}
             {channel?.email && (
-              <a href={`mailto:${channel.email}`} className="flex items-center gap-1 px-2 py-1.5 text-purple-600 hover:bg-purple-50 rounded-lg text-[10px] font-semibold transition-colors">
+              <a href={`mailto:${channel.email}`} className="flex items-center gap-1 px-2 py-1.5 text-text-secondary hover:bg-surface-2 rounded-lg text-[10px] font-semibold transition-colors">
                 <Mail size={12} /> Email</a>
             )}
             {phoneNumber && (
               <a href={`https://wa.me/${whatsappNumber}?text=Hola, le contacto de Naturgy.`} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2 py-1.5 text-green-600 hover:bg-green-50 rounded-lg text-[10px] font-semibold transition-colors">
+                className="flex items-center gap-1 px-2 py-1.5 text-text-secondary hover:bg-surface-2 rounded-lg text-[10px] font-semibold transition-colors">
                 <MessageCircle size={12} /> WhatsApp</a>
             )}
           </div>
@@ -432,10 +433,10 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
               className={`${inputClass} resize-none`} />
           </div>
           {formMode === 'register' && (
-            <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-2">
+            <div className="p-3 bg-navy-50/70 border border-navy-100 rounded-xl space-y-2">
               <div>
-                <div className="text-[10px] font-bold text-blue-700">Siguiente acción</div>
-                <div className="text-[9px] text-blue-500">Opcional. Si la completas, quedará directamente en la agenda.</div>
+                <div className="text-[10px] font-bold text-navy-700">Siguiente acción</div>
+                <div className="text-[9px] text-navy-400">Opcional. Si la completas, quedará directamente en la agenda.</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
@@ -459,9 +460,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
           )}
           <button onClick={() => saveInteraction(formMode === 'plan')}
             disabled={savingForm || (formMode === 'plan' && !newForm.planned_date)}
-            className={`w-full py-2.5 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${
-              formMode === 'plan' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-brand-500 hover:bg-brand-600'
-            }`}>
+            className="w-full py-2.5 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 bg-brand-500 hover:bg-brand-600">
             {savingForm ? <Loader2 size={12} className="animate-spin" /> : formMode === 'plan' ? <><Calendar size={12} /> Planificar</> : <><Save size={12} /> Guardar</>}
           </button>
         </div>
@@ -469,14 +468,14 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
 
       {/* Planned actions */}
       {planned.length > 0 && (
-        <div className="mx-3.5 mt-3 mb-1 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-xl">
-          <div className="text-[9px] font-bold text-blue-600 uppercase tracking-wider mb-2">Acciones planificadas ({planned.length})</div>
+        <div className="mx-3.5 mt-3 mb-1 px-3 py-2.5 bg-navy-50 border border-navy-100 rounded-xl">
+          <div className="text-[9px] font-bold text-navy-600 uppercase tracking-wider mb-2">Acciones planificadas ({planned.length})</div>
           <div className="space-y-1.5">
             {planned.map(item => {
               const cfg = TYPE_CONFIG[item.interaction_type] || TYPE_CONFIG.other;
               const Icon = cfg.icon;
               return (
-                <div key={item.id} className="flex items-center gap-2 py-1.5 border-b border-blue-100 last:border-0">
+                <div key={item.id} className="flex items-center gap-2 py-1.5 border-b border-navy-100 last:border-0">
                   <div className="w-6 h-6 rounded flex items-center justify-center" style={{ background: cfg.color + '20' }}>
                     <Icon size={12} style={{ color: cfg.color }} />
                   </div>
@@ -485,7 +484,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                     {item.notes && <div className="text-[9px] text-text-muted truncate">{item.notes}</div>}
                   </div>
                   <div className="text-right flex-shrink-0 mr-1">
-                    <div className="text-[10px] font-semibold text-blue-600">{item.planned_date ? formatPlannedDate(item.planned_date) : ''}</div>
+                    <div className="text-[10px] font-semibold text-navy-600">{item.planned_date ? formatPlannedDate(item.planned_date) : ''}</div>
                     {item.planned_time && <div className="text-[9px] text-text-muted">{item.planned_time.slice(0,5)}</div>}
                   </div>
                   <button onClick={() => completePlanned(item.id)}
@@ -532,8 +531,8 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                   <div className="flex-1 pb-4 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className="text-[11px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
-                      {activity.direction === 'outbound' && <span className="flex items-center gap-0.5 text-[9px] text-blue-500"><ArrowUpRight size={9} /> Saliente</span>}
-                      {activity.direction === 'inbound' && <span className="flex items-center gap-0.5 text-[9px] text-green-500"><ArrowDownLeft size={9} /> Entrante</span>}
+                      {activity.direction === 'outbound' && <span className="flex items-center gap-0.5 text-[9px] text-text-muted"><ArrowUpRight size={9} /> Saliente</span>}
+                      {activity.direction === 'inbound' && <span className="flex items-center gap-0.5 text-[9px] text-text-muted"><ArrowDownLeft size={9} /> Entrante</span>}
                       {resultCfg && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${resultCfg.bg} ${resultCfg.color}`}>{resultCfg.label}</span>}
                       {activity.duration > 0 && <span className="text-[9px] text-text-muted">{activity.duration} min</span>}
                       {isMeeting && activity.meetingDate && <span className="text-[9px] text-text-muted">📅 {new Date(activity.meetingDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>}

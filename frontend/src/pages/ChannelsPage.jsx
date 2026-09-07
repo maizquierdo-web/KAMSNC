@@ -67,14 +67,14 @@ function LeadSourceCheckboxes({ value = [], onChange, otherText = '', onOtherTex
   return (
     <div className="border border-surface-3 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
       {/* PULL */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border-b border-surface-3">
-        <span className="text-[9px] font-extrabold text-blue-600 uppercase tracking-wider">PULL</span>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-50 border-b border-surface-3">
+        <span className="text-[9px] font-extrabold text-navy-600 uppercase tracking-wider">PULL</span>
       </div>
       {pullOptions.map(renderOption)}
 
       {/* PUSH */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-pink-50 border-b border-surface-3 border-t border-surface-3">
-        <span className="text-[9px] font-extrabold text-pink-600 uppercase tracking-wider">PUSH</span>
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-2 border-b border-surface-3 border-t border-surface-3">
+        <span className="text-[9px] font-extrabold text-text-secondary uppercase tracking-wider">PUSH</span>
       </div>
       {pushOptions.map(renderOption)}
 
@@ -122,7 +122,7 @@ function ChannelList({ channels, loading, onSelect, filter, setFilter, search, s
         <div className="flex items-center gap-2">
           {isManager && (
             <button onClick={onBulkReassign}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-semibold rounded-lg transition-colors">
+              className="flex items-center gap-1.5 px-3 py-2 bg-surface-2 hover:bg-surface-3 text-text-secondary text-xs font-semibold rounded-lg transition-colors">
               <ArrowRightLeft size={13} />
               Reasignar
             </button>
@@ -573,7 +573,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 </div>
               </div>
               <button onClick={() => setCopilotOpen(true)}
-                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-[#BFDDE6] bg-[#EAF4F8] px-3 py-2 text-xs font-bold text-[#174A5B] transition-colors hover:border-[#9FCED9] hover:bg-[#DCEEF3] [&>svg]:text-[#0F9F95]">
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-navy-100 bg-navy-50 px-3 py-2 text-xs font-bold text-navy-700 transition-colors hover:border-navy-200 hover:bg-navy-100 [&>svg]:text-navy-500">
                 <Sparkles size={14} /> Analizar con IA
               </button>
               <button onClick={startEdit}

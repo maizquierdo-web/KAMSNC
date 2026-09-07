@@ -18,7 +18,7 @@ function Field({ label, value, options, disabled, onChange }) {
   return <label className="block min-w-0">
     <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">{label} · obligatorio</span>
     <select value={value || 'unassigned'} disabled={disabled} onChange={event => onChange(event.target.value)}
-      className="w-full rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-xs font-semibold text-text-primary focus:border-teal-500 focus:outline-none disabled:opacity-60">
+      className="w-full rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-xs font-semibold text-text-primary focus:border-navy-500 focus:outline-none disabled:opacity-60">
       {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
   </label>;
@@ -63,14 +63,14 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
     }
   }
 
-  return <section className="mb-4 overflow-hidden rounded-xl border border-teal-200 bg-white">
-    <div className="flex items-center justify-between border-b border-teal-100 bg-teal-50/50 px-4 py-3">
+  return <section className="mb-4 overflow-hidden rounded-xl border border-navy-100 bg-white">
+    <div className="flex items-center justify-between border-b border-navy-100 bg-navy-50/50 px-4 py-3">
       <div className="flex items-center gap-2">
-        <Settings2 size={16} className="text-teal-600" />
+        <Settings2 size={16} className="text-navy-600" />
         <div><div className="text-sm font-bold text-text-primary">Operativa CAEs</div><div className="text-[10px] text-text-muted">Asignaciones del canal activo</div></div>
       </div>
       <div className="flex items-center gap-1.5 text-[10px] font-semibold">
-        {savingField && <><Loader2 size={12} className="animate-spin text-teal-600" /><span className="text-text-muted">Guardando…</span></>}
+        {savingField && <><Loader2 size={12} className="animate-spin text-navy-600" /><span className="text-text-muted">Guardando…</span></>}
         {saved && !savingField && <><Check size={12} className="text-green-600" /><span className="text-green-600">Guardado</span></>}
       </div>
     </div>

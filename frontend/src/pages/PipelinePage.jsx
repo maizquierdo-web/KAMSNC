@@ -131,7 +131,7 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
             </span>
           )}
           {channel.potencial_energia && (
-            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400">
+            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-navy-500/10 text-navy-400">
               E: {channel.potencial_energia}
             </span>
           )}
@@ -683,8 +683,8 @@ export default function PipelinePage() {
           </p>
         </div>
         {isManager && (
-          <div className="px-2 py-1 bg-blue-50 border border-blue-200 rounded-lg">
-            <span className="text-[9px] font-bold text-blue-600 uppercase">{profile?.role === 'director' ? 'Director' : 'Manager'}</span>
+          <div className="px-2 py-1 bg-navy-50 border border-navy-100 rounded-lg">
+            <span className="text-[9px] font-bold text-navy-600 uppercase">{profile?.role === 'director' ? 'Director' : 'Manager'}</span>
           </div>
         )}
       </div>
@@ -747,17 +747,17 @@ export default function PipelinePage() {
       )}
 
       {loadingActivities && dateType !== 'creation' && (
-        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-          <Loader2 size={14} className="animate-spin text-blue-600" />
-          <span className="text-xs text-blue-600 font-semibold">Cargando actividad...</span>
+        <div className="mb-3 p-2 bg-navy-50 border border-navy-100 rounded-lg flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin text-navy-600" />
+          <span className="text-xs text-navy-600 font-semibold">Cargando actividad...</span>
         </div>
       )}
 
       {period !== 'all' && (
         <div className="flex gap-2 mb-3">
           {[
-            { val: newLeads,     label: 'Nuevos leads',  color: '#E87A1E' },
-            { val: advanced,     label: 'En proceso',    color: '#3b82f6' },
+            { val: newLeads,     label: 'Nuevos leads',  color: '#5a6078' },
+            { val: advanced,     label: 'En proceso',    color: '#003E6B' },
             { val: closed,       label: 'Activos',       color: '#16a34a' },
             { val: closedNoDeal, label: 'Sin acuerdo',   color: '#ef4444' },
           ].map((k, i) => (
@@ -785,7 +785,7 @@ export default function PipelinePage() {
                 </div>
                 <div className="flex gap-3 text-center">
                   <div><div className="text-[11px] font-bold text-[#E87A1E]">{kam.leads}</div><div className="text-[7px] text-[#8b90a0]">Leads</div></div>
-                  <div><div className="text-[11px] font-bold text-[#3b82f6]">{kam.pipeline}</div><div className="text-[7px] text-[#8b90a0]">Pipeline</div></div>
+                  <div><div className="text-[11px] font-bold text-[#003E6B]">{kam.pipeline}</div><div className="text-[7px] text-[#8b90a0]">Pipeline</div></div>
                   <div><div className="text-[11px] font-bold text-[#16a34a]">{kam.closed}</div><div className="text-[7px] text-[#8b90a0]">Activos</div></div>
                 </div>
               </button>

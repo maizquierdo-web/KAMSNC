@@ -317,11 +317,11 @@ Sé concreto y práctico. Si faltan datos, indícalo claramente y ajusta el scor
         {channel?.cif ? (
           <div className="space-y-2">
             <a href={`https://www.datoscif.es/empresa/${channel.cif}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-              <ExternalLink size={14} className="text-blue-500 flex-shrink-0" />
+              className="flex items-center gap-2 p-2.5 bg-navy-50 border border-navy-100 rounded-lg hover:bg-navy-100 transition-colors">
+              <ExternalLink size={14} className="text-navy-500 flex-shrink-0" />
               <div className="flex-1">
-                <div className="text-xs font-semibold text-blue-700">Consultar en DatosCIF.es</div>
-                <div className="text-[10px] text-blue-500">Ver información financiera pública · CIF: {channel.cif}</div>
+                <div className="text-xs font-semibold text-navy-700">Consultar en DatosCIF.es</div>
+                <div className="text-[10px] text-navy-500">Ver información financiera pública · CIF: {channel.cif}</div>
               </div>
             </a>
             <CifInlineEditor channel={channel} onChannelUpdate={onChannelUpdate} />

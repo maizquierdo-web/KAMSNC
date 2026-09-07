@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
-import { PIPELINE_CONFIG, PIPELINE_STAGES } from '../lib/crmConstants';
+import { ACTIVITY_VISUAL, PIPELINE_CONFIG, PIPELINE_STAGES } from '../lib/crmConstants';
 import PeriodSelector, { getPeriodRange } from '../components/PeriodSelector';
 import { Loader2, Users, Eye, ChevronRight, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 
@@ -271,7 +271,7 @@ export default function DashboardPage() {
           type: i.interaction_type, kam: i.profiles?.full_name || 'KAM',
           action: `${ACTION_LABELS[i.interaction_type] || i.interaction_type} realizada`,
           channel: i.channels?.name || 'Canal', time: i.created_at,
-          icon: ACTION_ICONS[i.interaction_type] || '📋', color: '#3b82f6',
+          icon: ACTION_ICONS[i.interaction_type] || '📋', color: ACTIVITY_VISUAL.color,
         })),
       ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8).map(a => {
         const diff = Math.floor((Date.now() - new Date(a.time).getTime()) / 60000);
@@ -319,8 +319,8 @@ export default function DashboardPage() {
             {teamKams.length} KAMs
           </p>
         </div>
-        <div className="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
-          <span className="text-[10px] font-bold text-blue-600 uppercase">{profile?.role === 'director' ? 'Director' : 'Manager'}</span>
+        <div className="px-3 py-1.5 bg-navy-50 border border-navy-100 rounded-lg">
+          <span className="text-[10px] font-bold text-navy-600 uppercase">{profile?.role === 'director' ? 'Director' : 'Manager'}</span>
         </div>
       </div>
 

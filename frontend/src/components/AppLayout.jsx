@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Building2, BarChart3, Trophy, Sparkles, CalendarDays, X, Bell } from 'lucide-react';
+import { Home, Building2, BarChart3, Trophy, Sparkles, CalendarDays, X, Bell, Database } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { offlineQueue } from '../lib/offline';
@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { BulkReassignModal } from './ChannelReassign';
 
 const AssistantPage = lazy(() => import('../pages/AssistantPage'));
+const BenchmarkPanel = lazy(() => import('./BenchmarkPanel'));
 
 const NATURGY_LOGO = 'https://www.naturgy.es/content/dam/naturgy/espana/global/logos/logo_naturgy_home_mobile.svg';
 
@@ -120,6 +121,7 @@ export function AppLayout() {
   const [pendingCount, setPendingCount] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [showAssistant, setShowAssistant] = useState(false);
+  const [showBenchmark, setShowBenchmark] = useState(false);
   const [showReassignModal, setShowReassignModal] = useState(false);
 
   // Acceso al módulo de administración: directores O usuarios con can_manage_users
@@ -160,8 +162,15 @@ export function AppLayout() {
         </button>
 
         <div className="flex items-center gap-2">
+          {/* Shared market benchmark */}
+          <button onClick={() => { setShowBenchmark(previous => !previous); setShowAssistant(false); }}
+            className="flex items-center gap-1.5 rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-teal-700 transition-all hover:bg-teal-50">
+            {showBenchmark ? <X size={14} /> : <Database size={14} />}
+            <span className="hidden sm:inline">{showBenchmark ? 'Cerrar' : 'Benchmark'}</span>
+          </button>
+
           {/* AI Assistant button */}
-          <button onClick={() => setShowAssistant(!showAssistant)}
+          <button onClick={() => { setShowAssistant(previous => !previous); setShowBenchmark(false); }}
             className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
             style={{
               background: showAssistant ? '#E87A1E' : 'rgba(232,122,30,0.08)',
@@ -248,7 +257,11 @@ export function AppLayout() {
         </div>
       )}
 
-      {!showAssistant && (
+      <Suspense fallback={null}>
+        <BenchmarkPanel open={showBenchmark} onClose={() => setShowBenchmark(false)} />
+      </Suspense>
+
+      {!showAssistant && !showBenchmark && (
         <nav className="bottom-nav border-t border-surface-3">
           <div className="flex justify-around py-2 px-2">
             {[...baseNavItems, ...(isManager ? [{ to: '/ranking', icon: Trophy, label: 'Ranking' }] : [])].map(({ to, icon: Icon, label }) => (

@@ -41,7 +41,7 @@ function setActiveCheckinStorage(data) {
 }
 
 // ============ MODAL DE SELECCIÓN DE CANAL ============
-function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, onSelect, onClose }) {
+function ChannelPicker({ channels, position, gpsLoading, gpsError, permissionState, onRetryGps, onSelect, onClose }) {
   const [search, setSearch] = useState('');
 
   // Ordenar por distancia si tenemos posición
@@ -69,6 +69,12 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, o
         </div>
 
         <div className="p-3 border-b border-surface-3">
+          {gpsLoading && (
+            <div className="mb-3 flex items-center gap-2 rounded-xl border border-navy-100 bg-navy-50/50 p-3 text-xs font-semibold text-navy-600">
+              <Loader2 size={15} className="animate-spin" />
+              Obteniendo una ubicación nueva…
+            </div>
+          )}
           {gpsError && (
             <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
               <div className="flex items-start gap-2 text-xs text-amber-400">
@@ -76,7 +82,9 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, o
                 <div className="flex-1">
                   <p className="font-semibold">{gpsError}</p>
                   <p className="mt-1 text-text-secondary">
-                    Si está bloqueado, activa Ubicación desde el candado de la barra del navegador y vuelve a intentarlo.
+                    {permissionState === 'denied'
+                      ? 'El navegador ha bloqueado nuevos avisos. Abre los permisos del sitio desde el icono de la barra de direcciones, cambia Ubicación a Permitir y vuelve aquí.'
+                      : 'Comprueba que la ubicación del dispositivo esté encendida y vuelve a intentarlo.'}
                   </p>
                 </div>
               </div>
@@ -86,8 +94,13 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, o
                 disabled={gpsLoading}
                 className="mt-2 w-full rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-bold text-amber-400 disabled:opacity-50"
               >
-                {gpsLoading ? 'Obteniendo ubicación...' : 'Reintentar ubicación'}
+                {gpsLoading ? 'Obteniendo ubicación...' : permissionState === 'denied' ? 'Ya he activado la ubicación' : 'Reintentar ubicación'}
               </button>
+            </div>
+          )}
+          {!gpsLoading && !gpsError && !position && (
+            <div className="mb-3 rounded-xl border border-surface-3 bg-surface-0 p-3 text-xs text-text-secondary">
+              Necesitamos una ubicación actual antes de seleccionar el canal.
             </div>
           )}
           <input
@@ -104,8 +117,10 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, o
           {sorted.map(ch => (
             <button
               key={ch.id}
+              type="button"
+              disabled={!position || gpsLoading}
               onClick={() => onSelect(ch)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl text-left hover:bg-surface-2 transition-colors"
+              className="w-full flex items-center gap-3 p-3 rounded-xl text-left hover:bg-surface-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
             >
               <div className="w-10 h-10 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center text-sm font-extrabold flex-shrink-0">
                 {ch.name.charAt(0)}
@@ -346,7 +361,7 @@ function VisitForm({ activeCheckin, gpsError, onSave, onCancel }) {
 // ============ COMPONENTE PRINCIPAL DE CHECK-IN ============
 export function CheckInButton({ className = '' }) {
   const { user } = useAuthContext();
-  const { position, loading: gpsLoading, error: gpsError, getPosition } = useGeolocation();
+  const { position, loading: gpsLoading, error: gpsError, permissionState, refreshPermission, getPosition } = useGeolocation();
   const [activeCheckin, setActiveCheckin] = useState(getActiveCheckin);
   const [channels, setChannels] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -378,15 +393,19 @@ export function CheckInButton({ className = '' }) {
   // Iniciar check-in: obtener GPS → seleccionar canal
   async function startCheckin() {
     setLoading(true);
+    setShowPicker(true);
     try {
-      const pos = await getPosition();
-      setShowPicker(true);
-    } catch (err) {
-      // Si GPS falla, igual dejamos seleccionar canal
-      setShowPicker(true);
+      await getPosition();
+    } catch {
+      // El selector permanece abierto con las instrucciones de recuperación.
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retryLocation() {
+    await refreshPermission();
+    return getPosition();
   }
 
   // Canal seleccionado → mostrar confirmación
@@ -550,7 +569,8 @@ export function CheckInButton({ className = '' }) {
           position={position}
           gpsLoading={gpsLoading}
           gpsError={gpsError}
-          onRetryGps={() => getPosition().catch(() => {})}
+          permissionState={permissionState}
+          onRetryGps={() => retryLocation().catch(() => {})}
           onSelect={handleChannelSelected}
           onClose={() => setShowPicker(false)}
         />

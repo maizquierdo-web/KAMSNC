@@ -27,7 +27,7 @@ export default function ChannelBusinessCasePrompt({ channelId, isCaes = false, v
       <button
         type="button"
         onClick={() => document.getElementById('channel-business-case')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-        className="col-span-2 flex min-w-0 items-center gap-2.5 border-t border-surface-3 bg-navy-50/70 p-3 text-left text-navy-600 transition-colors hover:bg-navy-100/70 lg:col-span-1 lg:border-l lg:border-t-0"
+        className="col-span-2 flex min-w-0 items-center gap-2.5 border-t border-surface-3 bg-navy-50/70 p-3 text-left text-navy-600 transition-colors hover:bg-navy-100/70 lg:col-span-1 lg:border-r lg:border-t-0"
       >
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/70">
           <FileWarning size={17} />

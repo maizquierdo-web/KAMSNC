@@ -121,11 +121,27 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
       const notes = (notesRes.status === 'fulfilled' ? notesRes.value.data : []) || [];
       const meetings = (meetingsRes.status === 'fulfilled' ? meetingsRes.value.data : []) || [];
 
+      const authorIds = [...new Set([
+        ...visits.map(item => item.kam_id),
+        ...interactions.map(item => item.user_id),
+        ...notes.map(item => item.user_id),
+        ...meetings.map(item => item.uploaded_by),
+      ].filter(Boolean))];
+      const { data: authorProfiles, error: authorError } = authorIds.length
+        ? await supabase.from('profiles').select('id, full_name').in('id', authorIds)
+        : { data: [], error: null };
+      if (authorError) console.error('No se pudieron cargar los responsables de las actividades:', authorError);
+      const authorNames = new Map((authorProfiles || []).map(profile => [profile.id, profile.full_name]));
+      const resolveAuthor = (id, relatedProfile) => authorNames.get(id) || relatedProfile?.full_name || 'Responsable no disponible';
+
       // Separate planned vs completed interactions
       const completedInter = interactions.filter(i => i.is_completed === true || (i.is_completed !== false && !i.planned_date));
       const plannedInter = interactions.filter(i => i.is_completed === false || (i.planned_date && i.is_completed !== true));
 
-      setPlanned(plannedInter.sort((a, b) => {
+      setPlanned(plannedInter.map(item => ({
+        ...item,
+        authorName: resolveAuthor(item.user_id, item.profiles),
+      })).sort((a, b) => {
         const da = a.planned_date || '9999'; const db = b.planned_date || '9999';
         return da.localeCompare(db);
       }));
@@ -135,23 +151,23 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
           _type: 'visit', _date: v.checkin_at, _id: `v-${v.id}`, _sourceId: v.id,
           result: v.result, duration: v.duration_minutes, notes: v.notes || v.result_notes,
           objective: v.objective, nextSteps: v.next_steps,
-          nextActionDate: v.next_action_date, userId: v.kam_id,
+          nextActionDate: v.next_action_date, authorName: resolveAuthor(v.kam_id), userId: v.kam_id,
         })),
         ...completedInter.map(i => ({
           _type: i.interaction_type, _date: i.created_at, _id: `i-${i.id}`, _sourceId: i.id, _source: 'interaction',
           direction: i.direction, result: i.result, duration: i.duration_minutes,
           subject: i.subject, notes: i.notes, contact: i.contact_person,
-          authorName: i.profiles?.full_name, userId: i.user_id,
+          authorName: resolveAuthor(i.user_id, i.profiles), userId: i.user_id,
         })),
         ...notes.map(n => ({
           _type: 'note', _date: n.created_at, _id: `n-${n.id}`, _sourceId: n.id, _source: 'note',
-          notes: n.content, authorName: n.profiles?.full_name, userId: n.user_id,
+          notes: n.content, authorName: resolveAuthor(n.user_id, n.profiles), userId: n.user_id,
         })),
         ...meetings.map(m => ({
           _type: 'meeting', _date: m.meeting_date || m.created_at, _id: `m-${m.id}`, _sourceId: m.id, _source: 'meeting',
           meetingDate: m.meeting_date, attendees: m.attendees, notes: m.notes,
           fileName: m.file_name, fileSize: m.file_size, fileUrl: m.file_url,
-          authorName: m.profiles?.full_name, userId: m.uploaded_by,
+          authorName: resolveAuthor(m.uploaded_by, m.profiles), userId: m.uploaded_by,
         })),
       ].sort((a, b) => new Date(b._date) - new Date(a._date));
 
@@ -480,7 +496,8 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                     <Icon size={12} style={{ color: cfg.color }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] font-semibold text-text-primary">{cfg.label}{item.contact_person ? ` · ${item.contact_person}` : ''}</div>
+                    <div className="text-[11px] font-semibold text-text-primary">{cfg.label} · {item.authorName}</div>
+                    {item.contact_person && <div className="text-[9px] text-text-muted truncate">Contacto: {item.contact_person}</div>}
                     {item.notes && <div className="text-[9px] text-text-muted truncate">{item.notes}</div>}
                   </div>
                   <div className="text-right flex-shrink-0 mr-1">
@@ -531,6 +548,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                   <div className="flex-1 pb-4 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className="text-[11px] font-bold" style={{ color: cfg.color }}>{cfg.label}</span>
+                      <span className="text-[9px] font-semibold text-text-secondary">· {activity.authorName}</span>
                       {activity.direction === 'outbound' && <span className="flex items-center gap-0.5 text-[9px] text-text-muted"><ArrowUpRight size={9} /> Saliente</span>}
                       {activity.direction === 'inbound' && <span className="flex items-center gap-0.5 text-[9px] text-text-muted"><ArrowDownLeft size={9} /> Entrante</span>}
                       {resultCfg && <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${resultCfg.bg} ${resultCfg.color}`}>{resultCfg.label}</span>}
@@ -543,7 +561,6 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                     {activity.subject && <div className="text-xs font-semibold text-text-primary mb-0.5">{activity.subject}</div>}
                     {isMeeting && activity.attendees && <div className="text-[10px] text-text-muted mb-0.5">👥 Asistentes: {activity.attendees}</div>}
                     {activity.contact && <div className="text-[10px] text-text-muted mb-0.5">👤 {activity.contact}</div>}
-                    {activity.authorName && (activity._type === 'note' || isMeeting) && <div className="text-[10px] text-text-muted mb-0.5">por {activity.authorName}</div>}
                     {activity.notes && <div className={`text-xs text-text-secondary leading-relaxed whitespace-pre-wrap ${isVisit ? 'bg-surface-1 rounded-lg p-2 mt-1' : ''}`}>{activity.notes}</div>}
                     {isMeeting && activity.fileUrl && (
                       <div className="mt-2 p-2 bg-surface-1 border border-surface-3 rounded-lg flex items-center gap-2">

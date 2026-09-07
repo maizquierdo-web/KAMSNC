@@ -29,7 +29,7 @@ export default function PreVisitBrief({ channelId, channelName }) {
   const { user } = useAuthContext();
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [error, setError] = useState('');
 
   async function generateBrief() {
@@ -159,6 +159,7 @@ Sé directo, práctico y orientado a la acción. Personaliza según los datos re
       }
 
       setBrief(parsed);
+      setExpanded(true);
     } catch (err) {
       console.error('Error generando brief:', err);
       setError(err.message || 'Error al generar el brief');

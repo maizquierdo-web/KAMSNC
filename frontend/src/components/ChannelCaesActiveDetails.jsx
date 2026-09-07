@@ -63,8 +63,8 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
     }
   }
 
-  return <section className="mb-4 overflow-hidden rounded-xl border border-navy-100 bg-white">
-    <div className="flex items-center justify-between border-b border-navy-100 bg-navy-50/50 px-4 py-3">
+  return <section className="mb-3 overflow-hidden rounded-xl border border-navy-100 bg-white">
+    <div className="flex items-center justify-between border-b border-navy-100 bg-navy-50/40 px-3.5 py-2.5">
       <div className="flex items-center gap-2">
         <Settings2 size={16} className="text-navy-600" />
         <div><div className="text-sm font-bold text-text-primary">Operativa CAEs</div><div className="text-[10px] text-text-muted">Asignaciones del canal activo</div></div>
@@ -75,7 +75,7 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       </div>
     </div>
     {error && <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
-    <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 p-3.5 md:grid-cols-2">
       <Field label="Oficina técnica" value={values.caes_technical_office} options={TECHNICAL_OFFICES} disabled={Boolean(savingField)} onChange={value => updateField('caes_technical_office', value)} />
       <Field label="Verificador" value={values.caes_verifier} options={VERIFIERS} disabled={Boolean(savingField)} onChange={value => updateField('caes_verifier', value)} />
     </div>

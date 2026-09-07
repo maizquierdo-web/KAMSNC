@@ -503,12 +503,12 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
       )}
 
       {/* Completed timeline */}
-      <div className="px-3.5 py-3 max-h-[500px] overflow-y-auto">
+      <div className="px-3.5 py-2.5 max-h-[500px] overflow-y-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-8"><Loader2 size={16} className="animate-spin text-brand-400" /></div>
+          <div className="flex items-center justify-center py-5"><Loader2 size={16} className="animate-spin text-brand-400" /></div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-8">
-            <Clock size={24} className="mx-auto mb-2 text-text-muted" />
+          <div className="text-center py-5">
+            <Clock size={20} className="mx-auto mb-1.5 text-text-muted" />
             <p className="text-xs text-text-muted">{filter === 'all' ? 'Sin actividad registrada' : 'Sin actividad de este tipo'}</p>
           </div>
         ) : (

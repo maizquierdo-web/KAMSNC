@@ -17,6 +17,10 @@ export function useGeolocation() {
     return new Promise((resolve, reject) => {
       setLoading(true);
       setError(null);
+      // Cada intento debe partir sin una posición anterior. De este modo, si
+      // el navegador rechaza o no puede resolver la nueva lectura, nunca se
+      // reutilizan coordenadas obtenidas en otro intento.
+      setPosition(null);
 
       if (!navigator.geolocation) {
         const err = 'Tu navegador no soporta geolocalización';
@@ -50,8 +54,8 @@ export function useGeolocation() {
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 30000, // Acepta posición de hasta 30s atrás
+          timeout: 15000,
+          maximumAge: 0,
         }
       );
     });

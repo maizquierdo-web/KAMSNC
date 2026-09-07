@@ -339,6 +339,8 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
         </div>
       </div>
 
+      <ChannelBusinessCasePrompt channelId={channel.id} isCaes={isCaes} variant="summary" />
+
       <div className="relative flex min-w-0 items-center gap-2.5 bg-surface-1 p-3">
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-sm font-bold text-white">
           {summary.responsible?.charAt(0) || '?'}
@@ -381,7 +383,6 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
         )}
       </div>
 
-      <ChannelBusinessCasePrompt channelId={channel.id} isCaes={isCaes} variant="summary" />
     </div>
   );
 }

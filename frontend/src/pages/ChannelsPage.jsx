@@ -9,7 +9,6 @@ import ClassificationSelector from '../components/ClassificationSelector';
 import CompanyAnalysis from '../components/CompanyAnalysis';
 import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
-import ChannelBusinessCasePrompt from '../components/ChannelBusinessCasePrompt';
 import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
 import ChannelCaesActiveDetails from '../components/ChannelCaesActiveDetails';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
@@ -693,7 +692,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           </>
         )}
 
-        <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
+        <ChannelActivitySummary channel={channel} isCaes={isCaesChannel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
           setChannel(prev => ({ ...prev, assigned_to: kamId }));
         }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
@@ -705,9 +704,6 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       <div className="mb-3 [&>div]:mb-0">
         <MeetingMinutes channelId={channelId} onChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
-
-      <ChannelBusinessCasePrompt channelId={channelId}
-        isCaes={isCaesChannel} />
 
       {channel.pipeline_stage === 'onboarding' && (
         <ChannelOnboardingDetails channel={channel}

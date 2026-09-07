@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowRight, FileWarning } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-export default function ChannelBusinessCasePrompt({ channelId, isCaes = false }) {
+export default function ChannelBusinessCasePrompt({ channelId, isCaes = false, variant = 'standalone' }) {
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -21,6 +21,26 @@ export default function ChannelBusinessCasePrompt({ channelId, isCaes = false })
   }, [channelId, isCaes]);
 
   if (!isCaes || !missing) return null;
+
+  if (variant === 'summary') {
+    return (
+      <button
+        type="button"
+        onClick={() => document.getElementById('channel-business-case')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        className="col-span-2 flex min-w-0 items-center gap-2.5 border-t border-surface-3 bg-navy-50/70 p-3 text-left text-navy-600 transition-colors hover:bg-navy-100/70 lg:col-span-1 lg:border-l lg:border-t-0"
+      >
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/70">
+          <FileWarning size={17} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Business Case</div>
+          <div className="truncate text-sm font-bold text-navy-700">Opcional</div>
+          <div className="mt-0.5 text-[10px] text-navy-500">Añadir si procede</div>
+        </div>
+        <ArrowRight size={12} className="flex-shrink-0" />
+      </button>
+    );
+  }
 
   return (
     <button

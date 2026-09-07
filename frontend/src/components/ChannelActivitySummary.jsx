@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
+import ChannelBusinessCasePrompt from './ChannelBusinessCasePrompt';
 import {
   ArrowRightLeft, CalendarDays, Check, ChevronDown, Clock3, Loader2, Save, TrendingUp, X,
 } from 'lucide-react';
@@ -42,7 +43,7 @@ function sourceFromTable(sourceTable) {
   return 'interaction';
 }
 
-export default function ChannelActivitySummary({ channel, refreshKey = 0, onReassigned, onActivityChange }) {
+export default function ChannelActivitySummary({ channel, isCaes = false, refreshKey = 0, onReassigned, onActivityChange }) {
   const { user } = useAuthContext();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -246,7 +247,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
   }[potential] || 'border-slate-200 bg-slate-50 text-slate-600';
 
   return (
-    <div className="-mx-3.5 -mb-3.5 mt-3 grid grid-cols-2 overflow-visible border-t border-surface-3 bg-white lg:grid-cols-4">
+    <div className="-mx-3.5 -mb-3.5 mt-3 grid grid-cols-2 overflow-visible border-t border-surface-3 bg-white lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none">
       <div className={`flex min-w-0 items-center gap-2.5 border-b border-r border-surface-3 p-3 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
         <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
           <Clock3 size={18} />
@@ -379,6 +380,8 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
           </div>
         )}
       </div>
+
+      <ChannelBusinessCasePrompt channelId={channel.id} isCaes={isCaes} variant="summary" />
     </div>
   );
 }

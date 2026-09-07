@@ -885,6 +885,7 @@ const ONBOARDING_OPTIONS = [
   ['delayed_by_channel', 'Proceso demorado por el canal'],
   ['order_contract_activated', 'Pedido y contrato activados'],
   ['user_created', 'Alta de usuario'],
+  ['onboarding_completed', 'Proceso de alta finalizado'],
 ];
 const ROLE_OPTIONS = [['pending', 'Pendiente de definir'], ['promoter', 'Promotor'], ['promoter_ot', 'Promotor + OT'], ['promoter_ot_verifier', 'Promotor + OT + Verificador']];
 const CONTRACT_OPTIONS = [['pending', 'Pendiente de definir'], ['model_2_alternative_payer', 'Modelo 2 · Pagador alternativo'], ['model_3_savings_facilitator', 'Modelo 3 · Facilitador de ahorro']];
@@ -892,11 +893,20 @@ const TIER_OPTIONS = [['pending', 'Pendiente de definir'], ['tier_a', 'Tramo A']
 const OFFICE_OPTIONS = [['sinceo2', 'SINCEO2'], ['e_program', 'E-PROGRAM'], ['unassigned', 'Sin OT asignada']];
 const VERIFIER_OPTIONS = [['margube', 'MARGUBE'], ['eqa', 'EQA'], ['unassigned', 'Sin verificador asignado']];
 
-function TransitionField({ label, value, options, onChange }) {
-  return <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label} *</span>
+function TransitionField({ label, value, options, onChange, required = true }) {
+  return <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}{required ? ' *' : ''}</span>
     <select value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
       {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
     </select>
+  </label>;
+}
+
+function TransitionTextField({ label, value, onChange }) {
+  return <label className="block">
+    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label} · opcional</span>
+    <input type="text" value={value} onChange={event => onChange(event.target.value)}
+      className="w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
+      placeholder="Introducir número de pedido" />
   </label>;
 }
 
@@ -909,10 +919,11 @@ function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel })
   } : {
     caes_technical_office: channel?.caes_technical_office || 'unassigned',
     caes_verifier: channel?.caes_verifier || 'unassigned',
+    caes_order_number: channel?.caes_order_number || '',
   });
   const update = (field, value) => setValues(current => ({ ...current, [field]: value }));
   const confirm = () => {
-    const stored = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value === 'pending' ? null : value]));
+    const stored = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value === 'pending' || value === '' ? null : value]));
     if (kind === 'onboarding') stored.onboarding_status_changed_at = new Date().toISOString();
     onConfirm(stored);
   };
@@ -932,6 +943,7 @@ function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel })
         </> : <>
           <TransitionField label="Oficina técnica" value={values.caes_technical_office} options={OFFICE_OPTIONS} onChange={value => update('caes_technical_office', value)} />
           <TransitionField label="Verificador" value={values.caes_verifier} options={VERIFIER_OPTIONS} onChange={value => update('caes_verifier', value)} />
+          <div className="sm:col-span-2"><TransitionTextField label="Número de Pedido" value={values.caes_order_number} onChange={value => update('caes_order_number', value)} /></div>
         </>}
       </div>
       <div className="mt-5 flex gap-2">

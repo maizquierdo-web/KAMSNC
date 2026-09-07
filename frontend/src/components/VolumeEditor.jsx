@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2, Save, BarChart3 } from 'lucide-react';
+import { Loader2, Save, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 
 const VOLUME_UNITS = [
   { key: 'residencial', label: 'Residencial', unit: 'SWE+SWG', color: '#3b82f6', bg: '#eff6ff' },
@@ -24,6 +24,7 @@ export function getVolumeConfig(unitKey) {
 export { VOLUME_UNITS };
 
 export default function VolumeEditor({ channel, onChannelUpdate }) {
+  const [expanded, setExpanded] = useState(false);
   const [amount, setAmount] = useState(channel?.volume_amount ?? '');
   const [unit, setUnit] = useState(channel?.volume_unit || '');
   const [saving, setSaving] = useState(false);
@@ -61,18 +62,22 @@ export default function VolumeEditor({ channel, onChannelUpdate }) {
 
   return (
     <div className="bg-white border border-surface-3 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-2 p-3.5 border-b border-surface-3">
-        <BarChart3 size={16} className="text-brand-500" />
-        <span className="text-sm font-bold text-text-primary">Volumen Anual Negociado</span>
-        {channel?.volume_amount != null && channel?.volume_unit && (
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-            style={{ background: getVolumeConfig(channel.volume_unit).bg, color: getVolumeConfig(channel.volume_unit).color }}>
-            {formatVolume(channel.volume_amount, channel.volume_unit)} {getVolumeConfig(channel.volume_unit).unit}
-          </span>
-        )}
-      </div>
+      <button type="button" onClick={() => setExpanded(current => !current)}
+        className={`flex w-full items-center justify-between gap-3 p-3.5 text-left transition-colors hover:bg-surface-1/50 ${expanded ? 'border-b border-surface-3' : ''}`}>
+        <span className="flex min-w-0 items-center gap-2">
+          <BarChart3 size={16} className="flex-shrink-0 text-brand-500" />
+          <span className="text-sm font-bold text-text-primary">Volumen Anual Negociado</span>
+          {channel?.volume_amount != null && channel?.volume_unit && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+              style={{ background: getVolumeConfig(channel.volume_unit).bg, color: getVolumeConfig(channel.volume_unit).color }}>
+              {formatVolume(channel.volume_amount, channel.volume_unit)} {getVolumeConfig(channel.volume_unit).unit}
+            </span>
+          )}
+        </span>
+        {expanded ? <ChevronUp size={14} className="flex-shrink-0 text-text-muted" /> : <ChevronDown size={14} className="flex-shrink-0 text-text-muted" />}
+      </button>
 
-      <div className="p-3.5 space-y-3">
+      {expanded && <div className="p-3.5 space-y-3">
         {/* Unit selector */}
         <div>
           <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Tipo de volumen</label>
@@ -120,7 +125,7 @@ export default function VolumeEditor({ channel, onChannelUpdate }) {
             {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <><span>✓</span> Guardado</> : <><Save size={13} /> Guardar volumen</>}
           </button>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

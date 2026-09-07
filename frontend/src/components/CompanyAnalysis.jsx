@@ -76,6 +76,7 @@ function CifInlineEditor({ channel, onChannelUpdate }) {
 
 export default function CompanyAnalysis({ channel, onChannelUpdate }) {
   const { user } = useAuthContext();
+  const [expanded, setExpanded] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -270,14 +271,19 @@ Sé concreto y práctico. Si faltan datos, indícalo claramente y ajusta el scor
   return (
     <div className="bg-white border border-surface-3 rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between p-3.5 border-b border-surface-3">
+      <button type="button" onClick={() => setExpanded(current => !current)}
+        className={`flex w-full items-center justify-between p-3.5 text-left transition-colors hover:bg-surface-1/50 ${expanded ? 'border-b border-surface-3' : ''}`}>
         <div className="flex items-center gap-2">
           <Shield size={16} className="text-navy-500" />
           <span className="text-sm font-bold text-text-primary">Análisis de empresa</span>
+          <span className="text-[10px] text-text-muted">
+            {analysis ? `Scoring ${analysis.scoring}/100` : channel?.informe_economico_url ? 'Informe disponible' : 'Sin analizar'}
+          </span>
         </div>
-      </div>
+        {expanded ? <ChevronUp size={14} className="text-text-muted" /> : <ChevronDown size={14} className="text-text-muted" />}
+      </button>
 
-      <div className="space-y-3.5 p-3.5">
+      {expanded && <div className="space-y-3.5 p-3.5">
 
         {/* Informe Económico */}
         <div>
@@ -433,7 +439,7 @@ Sé concreto y práctico. Si faltan datos, indícalo claramente y ajusta el scor
             </button>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

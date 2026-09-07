@@ -41,7 +41,7 @@ function setActiveCheckinStorage(data) {
 }
 
 // ============ MODAL DE SELECCIÓN DE CANAL ============
-function ChannelPicker({ channels, position, onSelect, onClose }) {
+function ChannelPicker({ channels, position, gpsLoading, gpsError, onRetryGps, onSelect, onClose }) {
   const [search, setSearch] = useState('');
 
   // Ordenar por distancia si tenemos posición
@@ -69,6 +69,27 @@ function ChannelPicker({ channels, position, onSelect, onClose }) {
         </div>
 
         <div className="p-3 border-b border-surface-3">
+          {gpsError && (
+            <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+              <div className="flex items-start gap-2 text-xs text-amber-400">
+                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold">{gpsError}</p>
+                  <p className="mt-1 text-text-secondary">
+                    Si está bloqueado, activa Ubicación desde el candado de la barra del navegador y vuelve a intentarlo.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onRetryGps}
+                disabled={gpsLoading}
+                className="mt-2 w-full rounded-lg border border-amber-500/30 px-3 py-2 text-xs font-bold text-amber-400 disabled:opacity-50"
+              >
+                {gpsLoading ? 'Obteniendo ubicación...' : 'Reintentar ubicación'}
+              </button>
+            </div>
+          )}
           <input
             type="text"
             value={search}
@@ -112,7 +133,7 @@ function ChannelPicker({ channels, position, onSelect, onClose }) {
 }
 
 // ============ FORMULARIO DE FICHA DE VISITA ============
-function VisitForm({ activeCheckin, onSave, onCancel }) {
+function VisitForm({ activeCheckin, gpsError, onSave, onCancel }) {
   const [form, setForm] = useState({
     objective: '',
     result: '',
@@ -277,6 +298,20 @@ function VisitForm({ activeCheckin, onSave, onCancel }) {
             </div>
 
             {/* Botones */}
+            {gpsError && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">{gpsError}</p>
+                    <p className="mt-1 text-text-secondary">
+                      La ficha no se ha perdido. Activa Ubicación desde el candado del navegador y pulsa de nuevo Guardar visita.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button
               onClick={handleSave}
               disabled={saving}
@@ -364,10 +399,11 @@ export function CheckInButton({ className = '' }) {
   // Confirmar check-in
   async function confirmCheckin() {
     setLoading(true);
-    setShowConfirm(false);
 
     try {
-      const pos = position || { latitude: null, longitude: null, accuracy: null };
+      // Confirmar siempre con una lectura recién obtenida. No usamos el estado
+      // previo porque podría pertenecer a un intento anterior.
+      const pos = await getPosition();
 
       const { data, error } = await supabase
         .from('visits')
@@ -394,9 +430,11 @@ export function CheckInButton({ className = '' }) {
 
       setActiveCheckin(checkinData);
       setActiveCheckinStorage(checkinData);
+      setShowConfirm(false);
       setToast({ type: 'success', message: `Check-in en ${selectedChannel.name}` });
     } catch (err) {
-      setToast({ type: 'error', message: 'Error al hacer check-in: ' + err.message });
+      setShowConfirm(true);
+      setToast({ type: 'error', message: 'No se ha registrado el check-in: ' + err.message });
     } finally {
       setLoading(false);
     }
@@ -410,7 +448,9 @@ export function CheckInButton({ className = '' }) {
   // Guardar visita (check-out)
   async function handleSaveVisit(formData) {
     try {
-      const pos = await getPosition().catch(() => ({ latitude: null, longitude: null }));
+      // El check-out también debe registrar una lectura actual. Si falla, el
+      // formulario permanece abierto para poder corregir el permiso y reintentar.
+      const pos = await getPosition();
 
       const { error } = await supabase
         .from('visits')
@@ -434,7 +474,7 @@ export function CheckInButton({ className = '' }) {
       setShowVisitForm(false);
       setToast({ type: 'success', message: 'Visita guardada correctamente' });
     } catch (err) {
-      setToast({ type: 'error', message: 'Error al guardar: ' + err.message });
+      setToast({ type: 'error', message: 'No se ha guardado la visita: ' + err.message });
     }
   }
 
@@ -508,6 +548,9 @@ export function CheckInButton({ className = '' }) {
         <ChannelPicker
           channels={channels}
           position={position}
+          gpsLoading={gpsLoading}
+          gpsError={gpsError}
+          onRetryGps={() => getPosition().catch(() => {})}
           onSelect={handleChannelSelected}
           onClose={() => setShowPicker(false)}
         />
@@ -537,9 +580,16 @@ export function CheckInButton({ className = '' }) {
             )}
 
             {!position && (
-              <div className="text-center text-xs text-amber-400 font-semibold mb-5">
-                <AlertCircle size={12} className="inline mr-1" />
-                Sin GPS — check-in no verificado
+              <div className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-400">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">{gpsError || 'Es necesario obtener tu ubicación actual.'}</p>
+                    <p className="mt-1 text-text-secondary">
+                      Si el permiso está bloqueado, actívalo desde el candado de la barra del navegador.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -549,7 +599,7 @@ export function CheckInButton({ className = '' }) {
               className="w-full py-3.5 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 mb-2"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-              Confirmar Check-in
+              {loading ? 'Comprobando ubicación...' : position ? 'Confirmar Check-in' : 'Reintentar y confirmar'}
             </button>
 
             <button
@@ -566,6 +616,7 @@ export function CheckInButton({ className = '' }) {
       {showVisitForm && activeCheckin && (
         <VisitForm
           activeCheckin={activeCheckin}
+          gpsError={gpsError}
           onSave={handleSaveVisit}
           onCancel={handleCancelVisit}
         />

@@ -404,7 +404,7 @@ export default function AssistantPage() {
             ...visits.map(v => ({ name: v.channels?.name || 'Canal', value: v.planned_date, badge: '📍 Visita', badgeClass: 'bg-orange-50 text-orange-600', time: v.planned_time?.slice(0,5) })),
             ...actions.map(a => {
               const label = ACTION_TYPE_LABELS[a.interaction_type] || a.interaction_type;
-              return { name: a.channels?.name || 'Canal', value: a.planned_date, badge: label, badgeClass: 'bg-blue-50 text-blue-600', time: a.planned_time?.slice(0,5) };
+              return { name: a.channels?.name || 'Canal', value: a.planned_date, badge: label, badgeClass: 'bg-navy-50 text-navy-600', time: a.planned_time?.slice(0,5) };
             }),
           ].sort((a, b) => `${a.value} ${a.time}`.localeCompare(`${b.value} ${b.time}`));
 
@@ -449,7 +449,7 @@ export default function AssistantPage() {
             ...inters.filter(i => i.is_completed === false && i.planned_date).map(i => ({
               name: `⏳ ${ACTION_TYPE_LABELS[i.interaction_type] || i.interaction_type}`,
               value: new Date(i.planned_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }),
-              badge: 'Planificada', badgeClass: 'bg-blue-50 text-blue-600',
+              badge: 'Planificada', badgeClass: 'bg-navy-50 text-navy-600',
               _date: i.planned_date,
             })),
           ].sort((a, b) => new Date(b._date) - new Date(a._date)).map(({ _date, ...rest }) => rest);

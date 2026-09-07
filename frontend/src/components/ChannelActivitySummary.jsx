@@ -241,14 +241,14 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
   const potentialStyle = {
     Bajo: 'border-slate-200 bg-slate-50 text-slate-600',
     Medio: 'border-amber-300 bg-amber-50 text-amber-600',
-    Alto: 'border-green-300 bg-green-50 text-green-600',
-    'Muy Alto': 'border-teal-300 bg-teal-50 text-teal-600',
+    Alto: 'border-navy-200 bg-navy-50 text-navy-600',
+    'Muy Alto': 'border-brand-200 bg-brand-50 text-brand-600',
   }[potential] || 'border-slate-200 bg-slate-50 text-slate-600';
 
   return (
     <div className="mb-4 grid grid-cols-2 overflow-visible rounded-xl border border-surface-3 bg-white lg:grid-cols-4">
-      <div className={`flex min-w-0 items-center gap-3 border-b border-r border-surface-3 p-3.5 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-blue-50/40'}`}>
-        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+      <div className={`flex min-w-0 items-center gap-3 border-b border-r border-surface-3 p-3.5 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
+        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
           <Clock3 size={20} />
         </div>
         <div className="min-w-0">
@@ -323,8 +323,8 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         )}
       </div>
 
-      <div className="flex min-w-0 items-center gap-3 border-r border-surface-3 bg-amber-50/40 p-3.5">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-500">
+      <div className="flex min-w-0 items-center gap-3 border-r border-surface-3 bg-surface-1 p-3.5">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-surface-2 text-navy-500">
           <TrendingUp size={20} />
         </div>
         <div className="min-w-0">
@@ -338,8 +338,8 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         </div>
       </div>
 
-      <div className="relative flex min-w-0 items-center gap-3 bg-teal-50/40 p-3.5">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-teal-500 text-sm font-bold text-white">
+      <div className="relative flex min-w-0 items-center gap-3 bg-surface-1 p-3.5">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-sm font-bold text-white">
           {summary.responsible?.charAt(0) || '?'}
         </div>
         <div className="min-w-0 flex-1">
@@ -349,7 +349,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         </div>
         <button onClick={() => { setReassignOpen(open => !open); setReassignError(''); }} disabled={reassigning}
             title="Cambiar KAM responsable"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 disabled:opacity-50">
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-surface-3 bg-white text-text-secondary transition-colors hover:bg-surface-2 disabled:opacity-50">
             {reassigning ? <Loader2 size={14} className="animate-spin" />
               : reassignOpen ? <ChevronDown size={14} className="rotate-180" /> : <ArrowRightLeft size={14} />}
         </button>
@@ -362,8 +362,8 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
               const current = kam.id === channel.assigned_to;
               return (
                 <button key={kam.id} onClick={() => reassign(kam)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${current ? 'bg-teal-50' : 'hover:bg-surface-1'}`}>
-                  <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${current ? 'bg-teal-500' : 'bg-blue-600'}`}>
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${current ? 'bg-navy-50' : 'hover:bg-surface-1'}`}>
+                  <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${current ? 'bg-navy-500' : 'bg-slate-500'}`}>
                     {kam.full_name?.charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -372,7 +372,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
                       {kam.role === 'kam' ? 'KAM' : 'Coordinación'} · Zona {kam.zone || '-'}
                     </div>
                   </div>
-                  {current && <Check size={13} className="text-teal-500" />}
+                  {current && <Check size={13} className="text-navy-500" />}
                 </button>
               );
             })}

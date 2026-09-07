@@ -11,12 +11,12 @@
 // Si cambias un color, cámbialo aquí y se reflejará en todo el CRM.
 export const STATUS_CONFIG = {
   pendiente_contacto: { label: 'Pendiente contacto', color: '#94a3b8', bg: 'bg-slate-500/20',  text: 'text-slate-400',  border: 'border-slate-500/30',  bg_rgba: 'rgba(148,163,184,0.1)', border_rgba: 'rgba(148,163,184,0.25)' },
-  en_desarrollo:      { label: 'En desarrollo',      color: '#eab308', bg: 'bg-yellow-500/20', text: 'text-yellow-500', border: 'border-yellow-500/30', bg_rgba: 'rgba(234,179,8,0.1)',   border_rgba: 'rgba(234,179,8,0.25)'   },
-  en_evaluacion:      { label: 'En evaluación',      color: '#8b5cf6', bg: 'bg-violet-500/20', text: 'text-violet-500', border: 'border-violet-500/30', bg_rgba: 'rgba(139,92,246,0.1)',  border_rgba: 'rgba(139,92,246,0.25)'  },
-  en_proceso_alta:    { label: 'En proceso de alta', color: '#06b6d4', bg: 'bg-cyan-500/20',   text: 'text-cyan-500',   border: 'border-cyan-500/30',   bg_rgba: 'rgba(6,182,212,0.1)',   border_rgba: 'rgba(6,182,212,0.25)'   },
+  en_desarrollo:      { label: 'En desarrollo',      color: '#4f7ba7', bg: 'bg-navy-400/20',   text: 'text-navy-400',   border: 'border-navy-400/30',   bg_rgba: 'rgba(79,123,167,0.1)',  border_rgba: 'rgba(79,123,167,0.25)'  },
+  en_evaluacion:      { label: 'En evaluación',      color: '#003E6B', bg: 'bg-navy-500/20',   text: 'text-navy-500',   border: 'border-navy-500/30',   bg_rgba: 'rgba(0,62,107,0.1)',    border_rgba: 'rgba(0,62,107,0.25)'    },
+  en_proceso_alta:    { label: 'En proceso de alta', color: '#003259', bg: 'bg-navy-600/20',   text: 'text-navy-600',   border: 'border-navy-600/30',   bg_rgba: 'rgba(0,50,89,0.1)',     border_rgba: 'rgba(0,50,89,0.25)'     },
   activo:             { label: 'Activo',             color: '#22c55e', bg: 'bg-green-500/20',  text: 'text-green-500',  border: 'border-green-500/30',  bg_rgba: 'rgba(34,197,94,0.1)',   border_rgba: 'rgba(34,197,94,0.25)'   },
   rechazado:          { label: 'Rechazado',          color: '#dc2626', bg: 'bg-red-600/20',    text: 'text-red-600',    border: 'border-red-600/30',    bg_rgba: 'rgba(220,38,38,0.1)',   border_rgba: 'rgba(220,38,38,0.25)'   },
-  cierre_sin_acuerdo: { label: 'Cierre sin acuerdo', color: '#db2777', bg: 'bg-pink-600/20',   text: 'text-pink-600',   border: 'border-pink-600/30',   bg_rgba: 'rgba(219,39,119,0.1)',  border_rgba: 'rgba(219,39,119,0.25)'  },
+  cierre_sin_acuerdo: { label: 'Cierre sin acuerdo', color: '#dc2626', bg: 'bg-red-600/20',    text: 'text-red-600',    border: 'border-red-600/30',    bg_rgba: 'rgba(220,38,38,0.1)',   border_rgba: 'rgba(220,38,38,0.25)'   },
 };
 
 // Array de estados en orden, derivado de STATUS_CONFIG.
@@ -62,12 +62,12 @@ export const PIPELINE_CONFIG = {
 // porque un pipeline stage puede mapearse a varios statuses).
 export const PIPELINE_STAGES = [
   { key: 'lead',           label: 'Lead',             color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.25)' },
-  { key: 'first_contact',  label: 'Primer contacto',  color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',  border: 'rgba(96,165,250,0.25)'  },
-  { key: 'proposal',       label: 'Propuesta',        color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.25)'  },
-  { key: 'negotiation',    label: 'Negociación',      color: '#eab308', bg: 'rgba(234,179,8,0.1)',   border: 'rgba(234,179,8,0.25)'   },
-  { key: 'onboarding',     label: 'En proceso alta',  color: '#06b6d4', bg: 'rgba(6,182,212,0.1)',   border: 'rgba(6,182,212,0.25)'   },
+  { key: 'first_contact',  label: 'Primer contacto',  color: '#7499bd', bg: 'rgba(116,153,189,0.1)', border: 'rgba(116,153,189,0.25)' },
+  { key: 'proposal',       label: 'Propuesta',        color: '#4f7ba7', bg: 'rgba(79,123,167,0.1)',  border: 'rgba(79,123,167,0.25)'  },
+  { key: 'negotiation',    label: 'Negociación',      color: '#d97706', bg: 'rgba(217,119,6,0.1)',   border: 'rgba(217,119,6,0.25)'   },
+  { key: 'onboarding',     label: 'En proceso alta',  color: '#003E6B', bg: 'rgba(0,62,107,0.1)',    border: 'rgba(0,62,107,0.25)'    },
   { key: 'active',         label: 'Activo',           color: '#22c55e', bg: 'rgba(34,197,94,0.1)',   border: 'rgba(34,197,94,0.25)'   },
-  { key: 'closed_no_deal', label: 'Sin acuerdo',      color: '#db2777', bg: 'rgba(219,39,119,0.1)',  border: 'rgba(219,39,119,0.25)'  },
+  { key: 'closed_no_deal', label: 'Sin acuerdo',      color: '#dc2626', bg: 'rgba(220,38,38,0.1)',   border: 'rgba(220,38,38,0.25)'   },
 ];
 
 // Stages disponibles al CREAR un canal (sin "closed_no_deal" — no tiene sentido nacer ya cerrado)
@@ -169,14 +169,22 @@ export const CHANNEL_CATEGORIES = {
 };
 
 // ============ ACTIVITY TYPES ============
+// Las categorías se distinguen por icono y etiqueta. El color informa del estado,
+// no del canal utilizado, para evitar una interfaz "arcoíris".
+export const ACTIVITY_VISUAL = {
+  color: '#003E6B',
+  bg: '#e8eef4',
+  border: '#9eb7d1',
+};
+
 export const ACTION_TYPES = [
-  { key: 'visit',    label: 'Visita',    icon: '📍', color: '#E87A1E', bg: '#FEF3E8' },
-  { key: 'call',     label: 'Llamada',   icon: '📞', color: '#3b82f6', bg: '#eff6ff' },
-  { key: 'email',    label: 'Email',     icon: '📧', color: '#8b5cf6', bg: '#f3eeff' },
-  { key: 'whatsapp', label: 'WhatsApp',  icon: '💬', color: '#16a34a', bg: '#e6f5ed' },
-  { key: 'meeting',  label: 'Reunión',   icon: '👥', color: '#E87A1E', bg: '#FEF3E8' },
-  { key: 'linkedin', label: 'LinkedIn',  icon: '💼', color: '#0077b5', bg: '#e8f4fd' },
-  { key: 'other',    label: 'Otro',      icon: '📋', color: '#5a6078', bg: '#f0f0f4' },
+  { key: 'visit',    label: 'Visita',    icon: '📍', ...ACTIVITY_VISUAL },
+  { key: 'call',     label: 'Llamada',   icon: '📞', ...ACTIVITY_VISUAL },
+  { key: 'email',    label: 'Email',     icon: '📧', ...ACTIVITY_VISUAL },
+  { key: 'whatsapp', label: 'WhatsApp',  icon: '💬', ...ACTIVITY_VISUAL },
+  { key: 'meeting',  label: 'Reunión',   icon: '👥', ...ACTIVITY_VISUAL },
+  { key: 'linkedin', label: 'LinkedIn',  icon: '💼', ...ACTIVITY_VISUAL },
+  { key: 'other',    label: 'Otro',      icon: '📋', ...ACTIVITY_VISUAL },
 ];
 
 // ============ RESULT OPTIONS ============

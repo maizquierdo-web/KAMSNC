@@ -3,17 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { CheckInButton } from '../components/CheckInButton';
+import { ACTIVITY_VISUAL } from '../lib/crmConstants';
 import { Loader2, MapPin, Phone, Mail, MessageCircle, Users, Linkedin, Calendar, Check, AlertTriangle, ArrowRight, Target, Activity, CircleAlert, Clock, X } from 'lucide-react';
 
 const TYPE_CONFIG = {
-  visit: { label: 'Visita', icon: MapPin, color: '#E87A1E', bg: 'bg-orange-50' },
-  call: { label: 'Llamada', icon: Phone, color: '#3b82f6', bg: 'bg-blue-50' },
-  email: { label: 'Email', icon: Mail, color: '#8b5cf6', bg: 'bg-purple-50' },
-  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: '#16a34a', bg: 'bg-green-50' },
-  meeting: { label: 'Reunión', icon: Users, color: '#E87A1E', bg: 'bg-orange-50' },
-  linkedin: { label: 'LinkedIn', icon: Linkedin, color: '#0077b5', bg: 'bg-blue-50' },
-  follow_up: { label: 'Seguimiento', icon: Clock, color: '#0f766e', bg: 'bg-emerald-50' },
-  other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: 'bg-gray-50' },
+  visit: { label: 'Visita', icon: MapPin, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  call: { label: 'Llamada', icon: Phone, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  email: { label: 'Email', icon: Mail, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  meeting: { label: 'Reunión', icon: Users, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  linkedin: { label: 'LinkedIn', icon: Linkedin, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  follow_up: { label: 'Seguimiento', icon: Clock, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
+  other: { label: 'Otro', icon: Calendar, color: ACTIVITY_VISUAL.color, bg: 'bg-navy-50' },
 };
 
 const ONBOARDING_LABELS = {
@@ -38,7 +39,7 @@ function daysSince(value) {
 
 function SummaryCard({ value, label, detail, tone = 'default', icon: Icon, onClick }) {
   const tones = {
-    default: 'border-surface-3 bg-surface-1 text-text-primary', blue: 'border-blue-200 bg-blue-50/70 text-blue-700',
+    default: 'border-surface-3 bg-surface-1 text-text-primary', blue: 'border-navy-100 bg-navy-50/70 text-navy-500',
     amber: 'border-amber-200 bg-amber-50/70 text-amber-700', red: 'border-red-200 bg-red-50/70 text-red-700',
   };
   return <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-400/40 ${tones[tone]}`}>
@@ -166,16 +167,16 @@ export default function HomePage() {
         <SummaryCard value={stats.overdue} label="Acciones vencidas" detail="Requieren atención" tone="red" icon={CircleAlert} onClick={() => setSelectedDetail('overdue')} />
       </div>
     </section>
-    {onboardingWarnings.length > 0 && <section className="overflow-hidden rounded-2xl border border-cyan-200 bg-cyan-50/35">
-      <div className="flex items-center justify-between border-b border-cyan-100 px-4 py-3">
+    {onboardingWarnings.length > 0 && <section className="overflow-hidden rounded-2xl border border-navy-100 bg-navy-50/35">
+      <div className="flex items-center justify-between border-b border-navy-100 px-4 py-3">
         <div><h2 className="text-sm font-bold text-text-primary">Seguimiento de altas</h2><p className="text-[10px] text-text-muted">Días transcurridos desde el último cambio de evolución</p></div>
-        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-cyan-100 px-2 text-xs font-bold text-cyan-700">{onboardingWarnings.length}</span>
+        <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-navy-100 px-2 text-xs font-bold text-navy-600">{onboardingWarnings.length}</span>
       </div>
-      <div className="divide-y divide-cyan-100">
-        {onboardingWarnings.slice(0, 5).map(item => <button key={item.id} onClick={() => openChannel(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-cyan-50">
-          <span className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-xs font-extrabold ${item.days > 10 ? 'bg-red-50 text-red-600' : item.days > 5 ? 'bg-amber-50 text-amber-700' : 'bg-white text-cyan-700'}`}>{item.days}</span>
+      <div className="divide-y divide-navy-100">
+        {onboardingWarnings.slice(0, 5).map(item => <button key={item.id} onClick={() => openChannel(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-navy-50">
+          <span className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-xs font-extrabold ${item.days > 10 ? 'bg-red-50 text-red-600' : item.days > 5 ? 'bg-amber-50 text-amber-700' : 'bg-white text-navy-600'}`}>{item.days}</span>
           <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold">{item.name}</span><span className="block truncate text-[10px] text-text-secondary">{item.status} · {item.days === 0 ? 'actualizado hoy' : `${item.days} ${item.days === 1 ? 'día' : 'días'} sin evolución`}</span></span>
-          <ArrowRight size={14} className="text-cyan-600" />
+          <ArrowRight size={14} className="text-navy-600" />
         </button>)}
       </div>
     </section>}
@@ -189,7 +190,7 @@ export default function HomePage() {
       </section>
       <section className="rounded-2xl border border-surface-3 bg-surface-1 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3"><div><h2 className="text-sm font-bold">Necesitan atención</h2><p className="text-[10px] text-text-muted">Prioridades detectadas automáticamente</p></div><span className="min-w-6 h-6 px-2 rounded-full bg-surface-2 text-xs font-bold flex items-center justify-center">{attentionItems.length}</span></div>
-        {attentionItems.length === 0 ? <div className="py-10 text-center text-sm text-text-secondary">Todo está al día.</div> : <div className="divide-y divide-surface-3">{attentionItems.slice(0, 8).map(item => <div key={item.key} className="flex items-center gap-3 px-4 py-3"><span className={`w-2 h-2 rounded-full ${item.severity === 'high' ? 'bg-red-500' : item.severity === 'medium' ? 'bg-amber-500' : 'bg-blue-500'}`} /><button onClick={() => openChannel(item.channelId)} className="flex-1 min-w-0 text-left"><div className="text-xs font-bold truncate">{item.channelName}</div><div className="text-[10px] text-text-secondary truncate"><span className="font-semibold">{item.title}</span> · {item.detail}</div></button>{item.alertId ? <button onClick={() => dismissAttention(item)} className="text-[10px] font-bold text-text-muted">Hecho</button> : <button onClick={() => openChannel(item.channelId)} className="text-[10px] font-bold text-brand-500 flex items-center gap-1">Abrir <ArrowRight size={11} /></button>}</div>)}</div>}
+        {attentionItems.length === 0 ? <div className="py-10 text-center text-sm text-text-secondary">Todo está al día.</div> : <div className="divide-y divide-surface-3">{attentionItems.slice(0, 8).map(item => <div key={item.key} className="flex items-center gap-3 px-4 py-3"><span className={`w-2 h-2 rounded-full ${item.severity === 'high' ? 'bg-red-500' : item.severity === 'medium' ? 'bg-amber-500' : 'bg-navy-500'}`} /><button onClick={() => openChannel(item.channelId)} className="flex-1 min-w-0 text-left"><div className="text-xs font-bold truncate">{item.channelName}</div><div className="text-[10px] text-text-secondary truncate"><span className="font-semibold">{item.title}</span> · {item.detail}</div></button>{item.alertId ? <button onClick={() => dismissAttention(item)} className="text-[10px] font-bold text-text-muted">Hecho</button> : <button onClick={() => openChannel(item.channelId)} className="text-[10px] font-bold text-brand-500 flex items-center gap-1">Abrir <ArrowRight size={11} /></button>}</div>)}</div>}
       </section>
     </div>
     {stats.overdue > 0 && <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-[10px] text-amber-800"><AlertTriangle size={14} />Las acciones vencidas permanecen visibles hasta completarlas o reprogramarlas en la Agenda.</div>}
@@ -197,7 +198,7 @@ export default function HomePage() {
       <aside className="absolute right-0 top-0 h-full w-full max-w-md bg-surface-0 border-l border-surface-3 shadow-2xl flex flex-col" onClick={event => event.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3"><div><p className="text-[10px] font-bold uppercase tracking-wider text-brand-500">Detalle de Mi día</p><h2 className="text-lg font-extrabold">{{ today: 'Acciones de hoy', withoutNext: 'Canales sin siguiente acción', inactive: 'Canales sin actividad +15 días', overdue: 'Acciones vencidas' }[selectedDetail]}</h2></div><button onClick={() => setSelectedDetail(null)} className="p-2 rounded-lg hover:bg-surface-2"><X size={19} /></button></div>
         <div className="flex-1 overflow-y-auto divide-y divide-surface-3">
-          {detailGroups[selectedDetail].length === 0 ? <div className="py-16 text-center text-sm text-text-secondary">No hay registros en este apartado.</div> : detailGroups[selectedDetail].map(item => <button key={item.id} onClick={() => openChannel(item.channelId)} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-surface-1 transition-colors"><span className={`w-2 h-2 rounded-full ${selectedDetail === 'overdue' ? 'bg-red-500' : selectedDetail === 'today' ? 'bg-blue-500' : 'bg-amber-500'}`} /><span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{item.channelName}</span><span className="block text-[11px] text-text-secondary">{item.title} · {item.detail}</span></span><ArrowRight size={15} className="text-text-muted" /></button>)}
+          {detailGroups[selectedDetail].length === 0 ? <div className="py-16 text-center text-sm text-text-secondary">No hay registros en este apartado.</div> : detailGroups[selectedDetail].map(item => <button key={item.id} onClick={() => openChannel(item.channelId)} className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-surface-1 transition-colors"><span className={`w-2 h-2 rounded-full ${selectedDetail === 'overdue' ? 'bg-red-500' : selectedDetail === 'today' ? 'bg-navy-500' : 'bg-amber-500'}`} /><span className="flex-1 min-w-0"><span className="block text-sm font-bold truncate">{item.channelName}</span><span className="block text-[11px] text-text-secondary">{item.title} · {item.detail}</span></span><ArrowRight size={15} className="text-text-muted" /></button>)}
         </div>
         <div className="p-4 border-t border-surface-3"><button onClick={() => navigate('/calendar')} className="w-full py-2.5 rounded-xl bg-brand-500 text-white text-xs font-bold">Abrir Agenda completa</button></div>
       </aside>

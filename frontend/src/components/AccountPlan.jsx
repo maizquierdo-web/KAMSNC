@@ -8,7 +8,7 @@ import {
 
 const ACTION_STATUS = {
   pending: { label: 'Pendiente', bg: 'bg-gray-100', text: 'text-gray-500', dot: 'bg-gray-400' },
-  in_progress: { label: 'En curso', bg: 'bg-blue-50', text: 'text-blue-600', dot: 'bg-blue-500' },
+  in_progress: { label: 'En curso', bg: 'bg-navy-50', text: 'text-navy-600', dot: 'bg-navy-500' },
   completed: { label: 'Completada', bg: 'bg-green-50', text: 'text-green-600', dot: 'bg-green-500' },
   cancelled: { label: 'Cancelada', bg: 'bg-red-50', text: 'text-red-500', dot: 'bg-red-400' },
 };
@@ -16,7 +16,7 @@ const ACTION_STATUS = {
 const PLAN_STATUS = {
   draft: { label: 'Borrador', color: 'text-gray-500', bg: 'bg-gray-100' },
   active: { label: 'Activo', color: 'text-green-600', bg: 'bg-green-50' },
-  completed: { label: 'Completado', color: 'text-blue-600', bg: 'bg-blue-50' },
+  completed: { label: 'Completado', color: 'text-green-600', bg: 'bg-green-50' },
   cancelled: { label: 'Cancelado', color: 'text-red-500', bg: 'bg-red-50' },
 };
 
@@ -70,11 +70,11 @@ function ActionItem({ action, onUpdate, onDelete }) {
       <button onClick={cycleStatus}
         className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
           action.status === 'completed' ? 'bg-green-500 border-green-500'
-            : action.status === 'in_progress' ? 'border-blue-400 bg-blue-50'
+            : action.status === 'in_progress' ? 'border-navy-400 bg-navy-50'
             : 'border-surface-4 hover:border-brand-400'
         }`}>
         {action.status === 'completed' && <Check size={11} className="text-white" strokeWidth={3} />}
-        {action.status === 'in_progress' && <div className="w-2 h-2 rounded-sm bg-blue-500" />}
+        {action.status === 'in_progress' && <div className="w-2 h-2 rounded-sm bg-navy-500" />}
       </button>
       <div className="flex-1 min-w-0">
         <div className={`text-sm ${action.status === 'completed' ? 'line-through text-text-muted' : 'text-text-primary'}`}>{action.title}</div>

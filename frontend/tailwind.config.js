@@ -4,6 +4,9 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Jerarquía cromática:
+        // brand = acciones principales; navy = información/IA; teal = Benchmark;
+        // green/amber/red = estados de éxito, atención y riesgo.
         brand: {
           50: '#fef6ee',
           100: '#fde9d0',

@@ -65,7 +65,7 @@ export function ChannelReassign({ channel, onReassigned }) {
     <div className="bg-white border border-surface-3 rounded-xl overflow-hidden mb-4">
       <div className="flex items-center justify-between p-3.5">
         <div className="flex items-center gap-2">
-          <ArrowRightLeft size={15} className="text-blue-500" />
+          <ArrowRightLeft size={15} className="text-navy-500" />
           <span className="text-sm font-bold text-text-primary">KAM asignado</span>
         </div>
         {saving && <Loader2 size={14} className="animate-spin text-brand-400" />}

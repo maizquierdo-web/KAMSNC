@@ -8,6 +8,7 @@ const ONBOARDING_OPTIONS = [
   { value: 'delayed_by_channel', label: 'Proceso demorado por el canal' },
   { value: 'order_contract_activated', label: 'Pedido y contrato activados' },
   { value: 'user_created', label: 'Alta de usuario' },
+  { value: 'onboarding_completed', label: 'Proceso de alta finalizado' },
 ];
 
 const CAES_ROLE_OPTIONS = [

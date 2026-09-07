@@ -567,9 +567,11 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${status.bg} ${status.text}`}>
                     {status.label}
                   </span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300">
-                    {pipeline}
-                  </span>
+                  {status.label !== pipeline && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300">
+                      {pipeline}
+                    </span>
+                  )}
                 </div>
               </div>
               <button onClick={() => setCopilotOpen(true)}

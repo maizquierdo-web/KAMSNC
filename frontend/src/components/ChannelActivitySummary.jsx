@@ -226,7 +226,7 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
 
   if (loading) {
     return (
-      <div className="mb-4 flex items-center justify-center rounded-xl border border-surface-3 bg-surface-1 py-6">
+      <div className="-mx-3.5 -mb-3.5 mt-3 flex items-center justify-center border-t border-surface-3 bg-surface-1 py-5">
         <Loader2 size={18} className="animate-spin text-brand-400" />
       </div>
     );
@@ -246,10 +246,10 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
   }[potential] || 'border-slate-200 bg-slate-50 text-slate-600';
 
   return (
-    <div className="mb-4 grid grid-cols-2 overflow-visible rounded-xl border border-surface-3 bg-white lg:grid-cols-4">
-      <div className={`flex min-w-0 items-center gap-3 border-b border-r border-surface-3 p-3.5 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
-        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
-          <Clock3 size={20} />
+    <div className="-mx-3.5 -mb-3.5 mt-3 grid grid-cols-2 overflow-visible border-t border-surface-3 bg-white lg:grid-cols-4">
+      <div className={`flex min-w-0 items-center gap-2.5 border-b border-r border-surface-3 p-3 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
+        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
+          <Clock3 size={18} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Última actividad</div>
@@ -262,9 +262,9 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
 
       <div onClick={openActionEditor} role="button" tabIndex={0}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openActionEditor(); }}
-        className="relative flex min-w-0 cursor-pointer items-center gap-3 border-b border-surface-3 bg-orange-50/40 p-3.5 transition-colors hover:bg-orange-50 lg:border-b-0 lg:border-r">
-        <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
-          <CalendarDays size={20} />
+        className="relative flex min-w-0 cursor-pointer items-center gap-2.5 border-b border-surface-3 bg-orange-50/40 p-3 transition-colors hover:bg-orange-50 lg:border-b-0 lg:border-r">
+        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
+          <CalendarDays size={18} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Siguiente acción</div>
@@ -323,9 +323,9 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         )}
       </div>
 
-      <div className="flex min-w-0 items-center gap-3 border-r border-surface-3 bg-surface-1 p-3.5">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-surface-2 text-navy-500">
-          <TrendingUp size={20} />
+      <div className="flex min-w-0 items-center gap-2.5 border-r border-surface-3 bg-surface-1 p-3">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-surface-2 text-navy-500">
+          <TrendingUp size={18} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Potencial</div>
@@ -338,8 +338,8 @@ export default function ChannelActivitySummary({ channel, refreshKey = 0, onReas
         </div>
       </div>
 
-      <div className="relative flex min-w-0 items-center gap-3 bg-surface-1 p-3.5">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-sm font-bold text-white">
+      <div className="relative flex min-w-0 items-center gap-2.5 bg-surface-1 p-3">
+        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-sm font-bold text-white">
           {summary.responsible?.charAt(0) || '?'}
         </div>
         <div className="min-w-0 flex-1">

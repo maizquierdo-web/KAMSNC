@@ -21,6 +21,7 @@ const ONBOARDING_OPTIONS = [
   { value: 'delayed_by_channel', label: 'Proceso demorado por el canal' },
   { value: 'order_contract_activated', label: 'Pedido y contrato activados' },
   { value: 'user_created', label: 'Alta de usuario' },
+  { value: 'onboarding_completed', label: 'Proceso de alta finalizado' },
 ];
 
 const CAES_ROLE_OPTIONS = [
@@ -61,6 +62,7 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
     caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
     caes_technical_office: channel.caes_technical_office || 'unassigned',
     caes_verifier: channel.caes_verifier || 'unassigned',
+    caes_order_number: channel.caes_order_number || '',
   });
   const [savingField, setSavingField] = useState('');
   const [saved, setSaved] = useState(false);
@@ -74,14 +76,16 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
       caes_technical_office: channel.caes_technical_office || 'unassigned',
       caes_verifier: channel.caes_verifier || 'unassigned',
+      caes_order_number: channel.caes_order_number || '',
     });
-  }, [channel.id, channel.onboarding_status, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier]);
+  }, [channel.id, channel.onboarding_status, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier, channel.caes_order_number]);
 
-  async function updateField(field, value) {
-    const previous = values[field];
+  async function updateField(field, value, previousValue) {
+    const previous = previousValue === undefined ? values[field] : previousValue;
     const storesPendingAsNull = ['onboarding_status', 'caes_role', 'caes_contract_model', 'caes_remuneration_tier'].includes(field);
-    const storedValue = storesPendingAsNull && value === 'pending' ? null : value;
-    setValues(current => ({ ...current, [field]: value }));
+    const normalizedValue = field === 'caes_order_number' ? value.trim() : value;
+    const storedValue = (storesPendingAsNull && normalizedValue === 'pending') || normalizedValue === '' ? null : normalizedValue;
+    setValues(current => ({ ...current, [field]: normalizedValue }));
     setSavingField(field);
     setSaved(false);
     setError('');
@@ -126,6 +130,18 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       <Field label="Tramo retributivo" value={values.caes_remuneration_tier} options={TIER_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('caes_remuneration_tier', value)} />
       <Field label="Oficina técnica" value={values.caes_technical_office} options={TECHNICAL_OFFICES} required disabled={Boolean(savingField)} onChange={value => updateField('caes_technical_office', value)} />
       <Field label="Verificador" value={values.caes_verifier} options={VERIFIERS} required disabled={Boolean(savingField)} onChange={value => updateField('caes_verifier', value)} />
+      <label className="block min-w-0">
+        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">Número de Pedido · opcional</span>
+        <input type="text" value={values.caes_order_number} disabled={Boolean(savingField)}
+          onChange={event => setValues(current => ({ ...current, caes_order_number: event.target.value }))}
+          onBlur={event => {
+            const previous = channel.caes_order_number || '';
+            if (event.target.value.trim() !== previous) updateField('caes_order_number', event.target.value, previous);
+          }}
+          onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+          placeholder="Sin número de pedido"
+          className="w-full rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-xs font-semibold text-text-primary focus:border-navy-500 focus:outline-none disabled:opacity-60" />
+      </label>
     </div>
   </section>;
 }

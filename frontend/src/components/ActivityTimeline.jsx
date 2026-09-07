@@ -4,7 +4,7 @@ import { useAuthContext } from './AuthProvider';
 import {
   Phone, Mail, MessageCircle, Linkedin, Users, Calendar,
   Loader2, Save, ChevronDown, Plus, X, Check,
-  ArrowUpRight, ArrowDownLeft, Clock, Trash2, MapPin, StickyNote, FileText, Download
+  ArrowUpRight, ArrowDownLeft, Clock, Trash2, MapPin, StickyNote, FileText, Download, ListFilter
 } from 'lucide-react';
 
 const TYPE_CONFIG = {
@@ -87,6 +87,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [formMode, setFormMode] = useState(null); // 'register' | 'plan' | 'note' | null
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
@@ -265,7 +266,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
           </div>
           <div className="flex gap-1.5">
             <div className="relative">
-              <button onClick={() => setShowAddMenu(!showAddMenu)}
+              <button onClick={() => { setShowAddMenu(!showAddMenu); setShowFilterMenu(false); }}
                 className="flex items-center gap-1 px-2.5 py-1.5 bg-surface-2 hover:bg-surface-3 text-text-secondary rounded-lg text-xs font-semibold transition-colors">
                 <Plus size={12} /> Registrar
               </button>
@@ -280,63 +281,61 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                 </div>
               )}
             </div>
-            <button onClick={() => { setFormMode('plan'); setShowAddMenu(false); }}
+            <button onClick={() => { setFormMode('plan'); setShowAddMenu(false); setShowFilterMenu(false); }}
               className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-semibold transition-colors">
               <Calendar size={12} /> Planificar
             </button>
           </div>
         </div>
 
-        {/* Primary work actions */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-          {[
-            { key: 'call', label: 'Registrar llamada', Icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
-            { key: 'meeting', label: 'Registrar reunión', Icon: Users, color: '#E87A1E', bg: '#FEF3E8' },
-            { key: 'visit', label: 'Registrar visita', Icon: MapPin, color: '#16a34a', bg: '#f0fdf4' },
-          ].map(({ key, label, Icon, color, bg }) => (
-            <button key={key} onClick={() => {
-              setNewForm(p => ({ ...p, interaction_type: key }));
-              setFormMode('register');
-              setShowAddMenu(false);
-            }} className="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-bold transition-transform hover:-translate-y-0.5"
-              style={{ color, background: bg, border: `1px solid ${color}30` }}>
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-          <button onClick={() => {
-            setNewForm(p => ({ ...p, interaction_type: 'call' }));
-            setFormMode('plan');
-            setShowAddMenu(false);
-          }} className="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-[11px] font-bold text-white bg-brand-500 hover:bg-brand-600 transition-transform hover:-translate-y-0.5">
-            <Calendar size={14} /> Añadir seguimiento
-          </button>
-        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Contact shortcuts */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-0.5 text-[9px] font-bold uppercase tracking-wider text-text-muted">Contactar</span>
+            {phoneNumber && (
+              <a href={`tel:${phoneNumber}`} className="flex items-center gap-1 px-2 py-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-[10px] font-semibold transition-colors">
+                <Phone size={12} /> Llamar</a>
+            )}
+            {channel?.email && (
+              <a href={`mailto:${channel.email}`} className="flex items-center gap-1 px-2 py-1.5 text-purple-600 hover:bg-purple-50 rounded-lg text-[10px] font-semibold transition-colors">
+                <Mail size={12} /> Email</a>
+            )}
+            {phoneNumber && (
+              <a href={`https://wa.me/${whatsappNumber}?text=Hola, le contacto de Naturgy.`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1 px-2 py-1.5 text-green-600 hover:bg-green-50 rounded-lg text-[10px] font-semibold transition-colors">
+                <MessageCircle size={12} /> WhatsApp</a>
+            )}
+          </div>
 
-        {/* Quick actions */}
-        <div className="flex gap-2 mb-3">
-          {phoneNumber && (
-            <a href={`tel:${phoneNumber}`} className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold transition-colors">
-              <Phone size={13} /> Llamar</a>
-          )}
-          {channel?.email && (
-            <a href={`mailto:${channel.email}`} className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg text-xs font-semibold transition-colors">
-              <Mail size={13} /> Email</a>
-          )}
-          {phoneNumber && (
-            <a href={`https://wa.me/${whatsappNumber}?text=Hola, le contacto de Naturgy.`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg text-xs font-semibold transition-colors">
-              <MessageCircle size={13} /> WhatsApp</a>
-          )}
-        </div>
-
-        {/* Filter pills */}
-        <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-          {filters.map(f => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                filter === f.key ? 'bg-brand-500/10 text-brand-500 border border-brand-500/30' : 'bg-surface-2 text-text-muted border border-surface-3'
-              }`}>{f.label}</button>
-          ))}
+          {/* Compact filters */}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => { setFilter('all'); setShowFilterMenu(false); }}
+              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition-colors ${
+                filter === 'all' ? 'bg-brand-500/10 text-brand-500' : 'text-text-muted hover:bg-surface-2'
+              }`}>Todo</button>
+            <div className="relative">
+              <button onClick={() => { setShowFilterMenu(!showFilterMenu); setShowAddMenu(false); }}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[10px] font-semibold transition-colors ${
+                  filter !== 'all' ? 'border-brand-500/30 bg-brand-500/10 text-brand-500' : 'border-surface-3 text-text-muted hover:bg-surface-2'
+                }`}>
+                <ListFilter size={12} />
+                {filter === 'all' ? 'Filtrar' : filters.find(item => item.key === filter)?.label}
+                <ChevronDown size={11} />
+              </button>
+              {showFilterMenu && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-surface-3 bg-white shadow-lg">
+                  {filters.filter(item => item.key !== 'all').map(item => (
+                    <button key={item.key} onClick={() => { setFilter(item.key); setShowFilterMenu(false); }}
+                      className={`flex w-full items-center px-3 py-2 text-left text-xs font-medium transition-colors ${
+                        filter === item.key ? 'bg-brand-500/10 text-brand-500' : 'text-text-secondary hover:bg-surface-1'
+                      }`}>
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

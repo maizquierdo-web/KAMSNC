@@ -101,8 +101,8 @@ export default function ChannelOnboardingDetails({ channel, isCaes = false, onUp
   }
 
   return (
-    <section className="mb-4 overflow-hidden rounded-xl border border-navy-100 bg-white">
-      <div className="flex items-center justify-between border-b border-navy-100 bg-navy-50/60 px-4 py-3">
+    <section className="mb-3 overflow-hidden rounded-xl border border-navy-100 bg-white">
+      <div className="flex items-center justify-between border-b border-navy-100 bg-navy-50/40 px-3.5 py-2.5">
         <div className="flex items-center gap-2">
           <ClipboardCheck size={16} className="text-navy-600" />
           <div>
@@ -121,7 +121,7 @@ export default function ChannelOnboardingDetails({ channel, isCaes = false, onUp
 
       {error && <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
 
-      <div className={`grid grid-cols-1 gap-3 p-4 ${isCaes ? 'md:grid-cols-2 xl:grid-cols-4' : ''}`}>
+      <div className={`grid grid-cols-1 gap-3 p-3.5 ${isCaes ? 'md:grid-cols-2 xl:grid-cols-4' : ''}`}>
         <Field label="Estado del alta · obligatorio" value={values.onboarding_status || 'documentation_requested'} options={ONBOARDING_OPTIONS} required
           disabled={Boolean(savingField)} onChange={value => updateField('onboarding_status', value)} />
         {isCaes && <>

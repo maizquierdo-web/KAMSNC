@@ -23,6 +23,7 @@ const ONBOARDING_LABELS = {
   delayed_by_channel: 'Demorado por el canal',
   order_contract_activated: 'Pedido y contrato activados',
   user_created: 'Alta de usuario',
+  onboarding_completed: 'Proceso de alta finalizado',
 };
 
 function dateKey(date = new Date()) {

@@ -133,18 +133,22 @@ export default function BusinessCase({ channelId }) {
 
   if (!businessCase) {
     return (
-      <div className="bg-white border border-surface-3 rounded-xl p-4">
-        <div className="text-center py-4">
-          <FileText size={24} className="mx-auto mb-2 text-text-muted" />
-          <p className="text-sm text-text-secondary mb-1">Business Case no adjuntado</p>
-          <p className="text-xs text-text-muted mb-3">
-            Adjunta el Business Case para centralizar la información económica y comercial del canal.
-          </p>
+      <div className="bg-white border border-surface-3 rounded-xl p-3.5">
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:text-left">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-surface-1">
+            <FileText size={19} className="text-text-muted" />
+          </div>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <p className="text-sm font-semibold text-text-secondary">Business Case no adjuntado</p>
+            <p className="mt-0.5 text-xs text-text-muted">
+              Adjunta el Business Case para centralizar la información económica y comercial del canal.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors inline-flex items-center gap-1.5"
+            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-brand-600 disabled:opacity-60"
           >
             {uploading ? (
               <><Loader2 size={14} className="animate-spin" /> Adjuntando...</>
@@ -159,7 +163,7 @@ export default function BusinessCase({ channelId }) {
   }
 
   return (
-    <div className="bg-white border border-surface-3 rounded-xl p-4">
+    <div className="bg-white border border-surface-3 rounded-xl p-3.5">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">

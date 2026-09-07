@@ -407,7 +407,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         ← Canales
       </button>
 
-      <div className="bg-surface-1 border border-surface-3 rounded-2xl p-4 mb-4">
+      <div className="bg-white border border-surface-3 rounded-xl p-3.5 mb-3">
         {editMode ? (
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -609,7 +609,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
               </div>
             )}
 
-            <div className="space-y-2 mt-3">
+            <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
               {channel.contact_name && (
                 <div className="flex items-center gap-2.5 text-sm">
                   <User size={14} className="text-text-muted flex-shrink-0" />
@@ -617,7 +617,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 </div>
               )}
               {channel.address && (
-                <div className="flex items-center gap-2.5 text-sm">
+                <div className="flex items-center gap-2.5 text-sm sm:col-span-2">
                   <MapPin size={14} className="text-text-muted flex-shrink-0" />
                   <span className="text-text-secondary">
                     {channel.address}
@@ -657,7 +657,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 </div>
               )}
               {channel.lead_source?.length > 0 && (
-                <div className="flex items-start gap-2.5 text-sm">
+                <div className="flex items-start gap-2.5 text-sm sm:col-span-2 xl:col-span-3">
                   <span className="text-text-muted flex-shrink-0 text-xs mt-0.5">📥</span>
                   <div className="flex flex-wrap gap-1">
                     {channel.lead_source.map(src => {
@@ -676,7 +676,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
             </div>
 
             {channel.notes && (
-              <div className="mt-4 p-3 bg-surface-0 rounded-lg">
+              <div className="mt-3 p-3 bg-surface-0 rounded-lg">
                 <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Notas</div>
                 <p className="text-xs text-text-secondary leading-relaxed">{channel.notes}</p>
               </div>
@@ -690,11 +690,19 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
             )}
           </>
         )}
+
+        <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
+          setChannel(prev => ({ ...prev, assigned_to: kamId }));
+        }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
 
-      <ChannelActivitySummary channel={channel} refreshKey={activityRefreshKey} onReassigned={(kamId) => {
-        setChannel(prev => ({ ...prev, assigned_to: kamId }));
-      }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
+      <div id="channel-activity" className="mb-3 scroll-mt-20">
+        <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
+      </div>
+
+      <div className="mb-3 [&>div]:mb-0">
+        <MeetingMinutes channelId={channelId} onChange={() => setActivityRefreshKey(key => key + 1)} />
+      </div>
 
       <ChannelBusinessCasePrompt channelId={channelId}
         isCaes={isCaesChannel} />
@@ -710,32 +718,24 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           onUpdate={changes => setChannel(current => ({ ...current, ...changes }))} />
       )}
 
-      <div className="mb-4">
+      <div className="mb-3">
         <ChannelClassification channelId={channelId} onUpdate={setClassifications} />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-3">
         <CompanyAnalysis channel={channel} onChannelUpdate={setChannel} />
       </div>
 
-      <div id="channel-activity" className="mb-4 scroll-mt-20">
-        <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
-      </div>
-
-      <div className="mb-4">
-        <MeetingMinutes channelId={channelId} onChange={() => setActivityRefreshKey(key => key + 1)} />
-      </div>
-
-      <div className="mb-4">
-        <VolumeEditor channel={channel} onChannelUpdate={setChannel} />
-      </div>
-
-      <div id="channel-business-case" className="mb-4 scroll-mt-20">
+      <div id="channel-business-case" className="mb-3 scroll-mt-20">
         <BusinessCase channelId={channelId} />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-3">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
+      </div>
+
+      <div className="mb-3">
+        <VolumeEditor channel={channel} onChannelUpdate={setChannel} />
       </div>
       </div>
 

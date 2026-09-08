@@ -123,7 +123,7 @@ function NotificationsBell({ userId, onReassignClick, onBenchmarkClick }) {
       {showPanel && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowPanel(false)} />
-          <div className="absolute right-0 top-11 z-50 max-h-[70vh] w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-surface-3 bg-white shadow-lg sm:w-96">
+          <div className="fixed left-3 right-3 top-[68px] z-50 max-h-[calc(100dvh-84px)] overflow-y-auto rounded-xl border border-surface-3 bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-11 sm:max-h-96 sm:w-96">
             <div className="px-4 py-3 border-b border-surface-3">
               <span className="text-sm font-bold text-text-primary">Notificaciones</span>
             </div>

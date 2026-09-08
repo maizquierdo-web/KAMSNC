@@ -254,6 +254,10 @@ CREATE TABLE profiles (
   avatar_url             text,
   is_active              boolean DEFAULT true,
   can_manage_users       boolean DEFAULT false,
+  benchmark_profile      text CHECK (
+    benchmark_profile IS NULL
+    OR benchmark_profile IN ('caes', 'new_business', 'integrated')
+  ),
   created_at             timestamptz DEFAULT now(),
   updated_at             timestamptz DEFAULT now()
 );

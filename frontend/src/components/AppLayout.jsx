@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Home, Building2, BarChart3, Trophy, Sparkles, CalendarDays, X, Bell, Database } from 'lucide-react';
+import { Home, Building2, BarChart3, Trophy, Sparkles, CalendarDays, X, Bell, Database, Download } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { offlineQueue } from '../lib/offline';
@@ -161,17 +161,28 @@ export function AppLayout() {
           <span className="font-bold text-sm text-text-primary tracking-tight">CRM para KAMs</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Configurable data export */}
+          <button
+            onClick={() => { navigate('/export'); setShowAssistant(false); setShowBenchmark(false); }}
+            title="Extraer datos"
+            aria-label="Extraer datos"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-surface-3 bg-white text-text-secondary transition-all hover:bg-surface-1 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2"
+          >
+            <Download size={14} />
+            <span className="hidden sm:inline text-xs font-semibold">Extraer</span>
+          </button>
+
           {/* Shared market benchmark */}
           <button onClick={() => { setShowBenchmark(previous => !previous); setShowAssistant(false); }}
-            className="flex items-center gap-1.5 rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-teal-700 transition-all hover:bg-teal-50">
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-teal-200 bg-white text-xs font-semibold text-teal-700 transition-all hover:bg-teal-50 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2">
             {showBenchmark ? <X size={14} /> : <Database size={14} />}
             <span className="hidden sm:inline">{showBenchmark ? 'Cerrar' : 'Benchmark'}</span>
           </button>
 
           {/* AI Assistant button */}
           <button onClick={() => { setShowAssistant(previous => !previous); setShowBenchmark(false); }}
-            className="relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+            className="relative flex h-9 w-9 items-center justify-center rounded-xl text-xs font-semibold transition-all sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2"
             style={{
               background: showAssistant ? '#E87A1E' : 'rgba(232,122,30,0.08)',
               color: showAssistant ? 'white' : '#E87A1E',
@@ -218,10 +229,6 @@ export function AppLayout() {
                   <NavLink to="/import" onClick={() => setShowMenu(false)}
                     className="block px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-1 hover:text-text-primary">
                     📥 Importar canales
-                  </NavLink>
-                  <NavLink to="/export" onClick={() => setShowMenu(false)}
-                    className="block px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-1 hover:text-text-primary">
-                    📤 Exportar datos
                   </NavLink>
                   <NavLink to="/report" onClick={() => setShowMenu(false)}
                     className="block px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-1 hover:text-text-primary">

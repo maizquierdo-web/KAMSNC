@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
 import { FileText, Plus, Trash2, Upload, X, Loader2, Calendar, Users, ChevronDown } from 'lucide-react';
+import BenchmarkCandidateModal from './BenchmarkCandidateModal';
+import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
+import { extractMeetingDocumentText } from '../lib/meetingDocumentText';
 
 export default function MeetingMinutes({ channelId, onChange }) {
   const { user } = useAuthContext();
@@ -15,6 +18,8 @@ export default function MeetingMinutes({ channelId, onChange }) {
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [benchmarkCandidate, setBenchmarkCandidate] = useState(null);
+  const [benchmarkNotice, setBenchmarkNotice] = useState('');
 
   useEffect(() => { if (channelId) loadMeetings(); }, [channelId]);
 
@@ -36,8 +41,22 @@ export default function MeetingMinutes({ channelId, onChange }) {
     if (!form.meeting_date) { setError('La fecha de la reunión es obligatoria'); return; }
     setSaving(true);
     setError('');
+    setBenchmarkNotice('');
     try {
       let file_url = null, file_name = null, file_size = null, file_type = null;
+      let documentText = '';
+      let unsupportedDocument = false;
+
+      if (file) {
+        try {
+          const extracted = await extractMeetingDocumentText(file);
+          documentText = extracted.text;
+          unsupportedDocument = !extracted.supported;
+        } catch (extractionError) {
+          console.warn('No se pudo extraer el texto del acta adjunta:', extractionError);
+          unsupportedDocument = true;
+        }
+      }
 
       // Upload file if selected
       if (file) {
@@ -65,11 +84,43 @@ export default function MeetingMinutes({ channelId, onChange }) {
       });
       if (insertError) throw insertError;
 
+      const sourceContent = [
+        `Acta de reunión del ${form.meeting_date}.`,
+        form.attendees.trim() ? `Asistentes: ${form.attendees.trim()}.` : '',
+        form.notes.trim() ? `Resumen aportado por el KAM: ${form.notes.trim()}` : '',
+        documentText ? `Contenido del documento adjunto ${file_name}: ${documentText}` : '',
+      ].filter(Boolean).join('\n');
+
       setForm({ meeting_date: '', attendees: '', notes: '' });
       setFile(null);
       setShowForm(false);
       loadMeetings();
       onChange?.();
+
+      if (sourceContent.length >= 20 && (form.notes.trim() || documentText)) {
+        try {
+          const candidate = await detectBenchmarkCandidate(sourceContent);
+          if (candidate) {
+            setBenchmarkCandidate({
+              candidate,
+              source: {
+                rawContent: sourceContent,
+                sourceType: 'meeting_minutes',
+                channelId,
+                sourceDate: form.meeting_date,
+                title: file_name ? `Acta · ${file_name}` : `Acta de reunión · ${form.meeting_date}`,
+              },
+            });
+          } else {
+            setBenchmarkNotice('Acta guardada. No se ha detectado información de mercado para incorporar.');
+          }
+        } catch (benchmarkError) {
+          console.warn('El acta se guardó, pero no pudo analizarse para Benchmark:', benchmarkError);
+          setBenchmarkNotice('Acta guardada. No se pudo revisar automáticamente su aportación al Benchmark.');
+        }
+      } else if (unsupportedDocument) {
+        setBenchmarkNotice('Acta guardada. Este formato no permite leer el contenido; añade un resumen para analizarlo en Benchmark.');
+      }
     } catch (err) {
       setError(err.message || 'Error al guardar el acta');
     } finally {
@@ -105,6 +156,7 @@ export default function MeetingMinutes({ channelId, onChange }) {
   const fieldClass = "w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 transition-colors";
 
   return (
+    <>
     <div className="bg-white border border-surface-3 rounded-2xl overflow-hidden mb-4">
       {/* Header */}
       <button onClick={() => setExpanded(!expanded)}
@@ -119,6 +171,7 @@ export default function MeetingMinutes({ channelId, onChange }) {
 
       {expanded && (
         <div className="px-4 pb-4">
+          {benchmarkNotice && <div className="mb-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-[10px] text-teal-700">{benchmarkNotice}</div>}
           {/* Add button */}
           {!showForm && (
             <button onClick={() => setShowForm(true)}
@@ -245,5 +298,12 @@ export default function MeetingMinutes({ channelId, onChange }) {
         </div>
       )}
     </div>
+    {benchmarkCandidate && <BenchmarkCandidateModal
+      candidate={benchmarkCandidate.candidate}
+      source={benchmarkCandidate.source}
+      onClose={() => setBenchmarkCandidate(null)}
+      onSaved={() => setBenchmarkNotice('Información incorporada al Benchmark compartido.')}
+    />}
+    </>
   );
 }

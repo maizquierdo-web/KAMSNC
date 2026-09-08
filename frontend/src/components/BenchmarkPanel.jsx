@@ -4,102 +4,25 @@ import {
   Loader2, Plus, Sparkles, X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import BenchmarkAnalysisView from './BenchmarkAnalysisView';
+import {
+  BENCHMARK_DOMAINS, BENCHMARK_SECTIONS, BENCHMARK_SUBDOMAINS,
+  classifyBenchmarkContribution, saveBenchmarkCandidate,
+} from '../lib/benchmarkCapture';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-
-const DOMAIN_LABELS = {
-  new_business: 'Nuevos Negocios',
-  caes: 'CAEs',
-  cross: 'Transversal',
-};
-
-const SUBDOMAIN_LABELS = {
-  wholesale: 'Mayorista',
-  solar: 'Solar',
-  sme: 'Pyme',
-  remote_sales: 'Venta Remota',
-  caes: 'CAEs',
-  cross: 'Transversal',
-};
-
-const SECTION_LABELS = {
-  general: 'Información general',
-  value_proposition: 'Propuesta de valor',
-  products_services: 'Productos y servicios',
-  commercial_model: 'Modelo comercial',
-  operations: 'Operativa',
-  technology: 'Tecnología',
-  incentives: 'Incentivos',
-  communication: 'Comunicación',
-  strengths: 'Fortalezas',
-  weaknesses: 'Debilidades',
-  risks: 'Riesgos',
-  opportunities: 'Oportunidades',
-  economic_conditions: 'Precios y condiciones',
-  organization_capabilities: 'Organización y capacidades',
-};
+const DOMAIN_LABELS = Object.fromEntries(BENCHMARK_DOMAINS.map(option => [option.value, option.label]));
+const SUBDOMAIN_LABELS = Object.fromEntries(BENCHMARK_SUBDOMAINS.map(option => [option.value, option.label]));
+const SECTION_LABELS = Object.fromEntries(BENCHMARK_SECTIONS.map(option => [option.value, option.label]));
 
 const VALID_DOMAINS = Object.keys(DOMAIN_LABELS);
-const VALID_SUBDOMAINS = Object.keys(SUBDOMAIN_LABELS);
 const VALID_SECTIONS = Object.keys(SECTION_LABELS);
-
-const EXTRACTION_PROMPT = `Eres el clasificador de aportaciones del Benchmark competitivo de Naturgy.
-Tu única tarea es transformar el texto de un KAM en una ficha estructurada, sin añadir hechos que no estén en el texto.
-
-Dominios:
-- new_business: negocios de captación y desarrollo de canales de energía, Mayorista, Solar, Pyme o Venta Remota.
-- caes: Certificados de Ahorro Energético.
-- cross: información que afecta claramente a ambos.
-
-Subdominios permitidos: wholesale, solar, sme, remote_sales, caes, cross.
-Secciones permitidas: general, value_proposition, products_services, commercial_model, operations, technology, incentives, communication, strengths, weaknesses, risks, opportunities, economic_conditions, organization_capabilities.
-
-Reglas:
-- Extrae una sola afirmación principal, concreta y autosuficiente.
-- competitor_name debe ser una empresa u operador identificado; usa cadena vacía si no aparece.
-- Esta fuente es una aportación de mercado, nunca la presentes como confirmada.
-- confidence mide solo la claridad de la extracción, no la veracidad, entre 0 y 100.
-- implication y recommended_action deben quedar vacíos si no se deducen prudentemente.
-- No inventes precios, fechas, nombres ni condiciones.
-
-Responde exclusivamente con JSON válido y esta forma:
-{"domain":"new_business|caes|cross","subdomain":"wholesale|solar|sme|remote_sales|caes|cross","section":"general|value_proposition|products_services|commercial_model|operations|technology|incentives|communication|strengths|weaknesses|risks|opportunities|economic_conditions|organization_capabilities","competitor_name":"","statement":"","confidence":0,"implication":"","recommended_action":"","tags":[]}`;
-
-function clean(value) {
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeDraft(parsed, originalText) {
-  const domain = VALID_DOMAINS.includes(parsed?.domain) ? parsed.domain : 'cross';
-  let subdomain = VALID_SUBDOMAINS.includes(parsed?.subdomain) ? parsed.subdomain : 'cross';
-  if (domain === 'caes') subdomain = 'caes';
-  if (domain === 'cross') subdomain = 'cross';
-  if (domain === 'new_business' && ['caes', 'cross'].includes(subdomain)) subdomain = 'wholesale';
-
-  return {
-    domain,
-    subdomain,
-    section: VALID_SECTIONS.includes(parsed?.section) ? parsed.section : 'general',
-    competitor_name: clean(parsed?.competitor_name),
-    statement: clean(parsed?.statement) || originalText.trim(),
-    confidence: Math.max(0, Math.min(100, Number(parsed?.confidence) || 0)),
-    implication: clean(parsed?.implication),
-    recommended_action: clean(parsed?.recommended_action),
-    tags: Array.isArray(parsed?.tags) ? parsed.tags.map(clean).filter(Boolean).slice(0, 8) : [],
-  };
-}
-
-function parseAssistantJson(rawText) {
-  const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
-  return JSON.parse(cleaned);
-}
 
 function formatDate(value) {
   return new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function BenchmarkPanel({ open, onClose }) {
-  const [mode, setMode] = useState('list');
+  const [mode, setMode] = useState('analyze');
   const [entries, setEntries] = useState([]);
   const [rawContent, setRawContent] = useState('');
   const [draft, setDraft] = useState(null);
@@ -120,10 +43,10 @@ export default function BenchmarkPanel({ open, onClose }) {
     try {
       const { data, error: queryError } = await supabase
         .from('benchmark_entries')
-        .select('id, domain, subdomain, section, statement, reliability, confidence, created_at, benchmark_competitors(name), benchmark_sources(source_type, source_date)')
+        .select('id, source_id, competitor_id, domain, subdomain, section, statement, entry_type, reliability, confidence, implication, recommended_action, tags, valid_until, created_at, updated_at, benchmark_competitors(name), benchmark_sources(id, source_type, title, source_date, channel_id, created_at)')
         .eq('status', 'incorporated')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(500);
       if (queryError) throw queryError;
       setEntries(data || []);
     } catch (queryError) {
@@ -154,19 +77,7 @@ export default function BenchmarkPanel({ open, onClose }) {
     setAnalyzing(true);
     setError('');
     try {
-      const response = await fetch(`${BACKEND_URL}/api/assistant`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: EXTRACTION_PROMPT,
-          messages: [{ role: 'user', content: rawContent.trim() }],
-        }),
-      });
-      if (!response.ok) throw new Error('No se pudo conectar con el clasificador');
-      const data = await response.json();
-      const assistantText = data.content?.map(item => item.text || '').join('').trim();
-      if (!assistantText) throw new Error('La IA no devolvió una propuesta');
-      setDraft(normalizeDraft(parseAssistantJson(assistantText), rawContent));
+      setDraft(await classifyBenchmarkContribution(rawContent));
       setMode('review');
     } catch (analysisError) {
       console.error('Error estructurando aportación:', analysisError);
@@ -194,19 +105,7 @@ export default function BenchmarkPanel({ open, onClose }) {
     setSaving(true);
     setError('');
     try {
-      const { error: saveError } = await supabase.rpc('add_manual_benchmark_entry', {
-        p_raw_content: rawContent.trim(),
-        p_competitor_name: draft.competitor_name || null,
-        p_domain: draft.domain,
-        p_subdomain: draft.subdomain,
-        p_section: draft.section,
-        p_statement: draft.statement.trim(),
-        p_confidence: Math.round(draft.confidence),
-        p_implication: draft.implication || null,
-        p_recommended_action: draft.recommended_action || null,
-        p_tags: draft.tags,
-      });
-      if (saveError) throw saveError;
+      await saveBenchmarkCandidate({ rawContent, draft, sourceType: 'manual' });
       setNotice('Información incorporada a la memoria colectiva.');
       setMode('list');
       setRawContent('');
@@ -228,17 +127,26 @@ export default function BenchmarkPanel({ open, onClose }) {
   return (
     <>
       <button aria-label="Cerrar Benchmark" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/20" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[460px]">
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[500px]">
         <div className="flex items-start justify-between border-b border-teal-100 bg-[#eaf7f5] px-4 py-4">
           <div className="flex gap-2.5">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-700"><Database size={18} /></div>
             <div>
               <h2 className="text-base font-extrabold text-slate-800">Benchmark</h2>
-              <p className="mt-0.5 text-[10px] text-slate-500">Memoria competitiva compartida</p>
+              <p className="mt-0.5 text-[10px] text-slate-500">Analista de inteligencia competitiva</p>
             </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"><X size={18} /></button>
         </div>
+
+        {['analyze', 'list'].includes(mode) && (
+          <div className="flex border-b border-surface-3 bg-white px-4">
+            <button onClick={() => { setMode('analyze'); setError(''); }} className={`border-b-2 px-3 py-3 text-xs font-bold ${mode === 'analyze' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-400'}`}>Analizar</button>
+            <button onClick={() => { setMode('list'); setError(''); }} className={`border-b-2 px-3 py-3 text-xs font-bold ${mode === 'list' ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-400'}`}>Memoria <span className="ml-1 font-normal">{entries.length}</span></button>
+          </div>
+        )}
+
+        {mode === 'analyze' && <BenchmarkAnalysisView entries={entries} loadingEntries={loadingEntries} />}
 
         {mode === 'list' && (
           <>

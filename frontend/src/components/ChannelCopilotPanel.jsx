@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, FileText, Loader2, MessageSquareText, Sparkles, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import BenchmarkCandidateModal from './BenchmarkCandidateModal';
+import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -35,6 +37,8 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   const [loadingContext, setLoadingContext] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [benchmarkCandidate, setBenchmarkCandidate] = useState(null);
+  const [benchmarkNotice, setBenchmarkNotice] = useState('');
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -42,6 +46,8 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
     setMessages([]);
     setInput('');
     setError('');
+    setBenchmarkCandidate(null);
+    setBenchmarkNotice('');
     loadContext();
   }, [open, channel?.id]);
 
@@ -154,6 +160,34 @@ ${contextOverride}`,
       const answer = data.content?.map(item => item.text || '').join('').trim();
       if (!answer) throw new Error('El asistente no devolvió una respuesta');
       setMessages(previous => [...previous, { role: 'assistant', text: answer, initial: isInitial }]);
+
+      // El resumen automático no es una aportación del usuario. En el resto de la
+      // conversación analizamos únicamente lo escrito por el KAM, nunca la respuesta
+      // generada por la IA, y pedimos confirmación antes de guardar nada.
+      if (!isInitial) {
+        const userTranscript = [
+          ...messages.filter(message => message.role === 'user').slice(-3).map(message => message.text),
+          question,
+        ]
+          .map((text, index) => `Aportación ${index + 1} del KAM: ${text}`)
+          .join('\n');
+
+        detectBenchmarkCandidate(userTranscript)
+          .then(candidate => {
+            if (!candidate) return;
+            setBenchmarkCandidate({
+              candidate,
+              source: {
+                rawContent: userTranscript,
+                sourceType: 'conversation',
+                channelId: channel.id,
+                sourceDate: new Date().toISOString().slice(0, 10),
+                title: `Conversación con copiloto · ${channel.name}`,
+              },
+            });
+          })
+          .catch(detectionError => console.warn('No se pudo analizar la conversación para Benchmark:', detectionError));
+      }
     } catch (requestError) {
       console.error('Error consultando el copiloto:', requestError);
       setError(requestError.message || 'No se pudo obtener una respuesta.');
@@ -187,6 +221,9 @@ ${contextOverride}`,
             <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">{contextStats.meetings} reuniones</span>
             <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">{contextStats.documents} documentos</span>
           </div>
+          {benchmarkNotice && (
+            <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-2 text-[10px] text-teal-700">{benchmarkNotice}</div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -231,6 +268,14 @@ ${contextOverride}`,
           </div>
         </div>
       </aside>
+      {benchmarkCandidate && (
+        <BenchmarkCandidateModal
+          candidate={benchmarkCandidate.candidate}
+          source={benchmarkCandidate.source}
+          onClose={() => setBenchmarkCandidate(null)}
+          onSaved={() => setBenchmarkNotice('Información incorporada al Benchmark compartido.')}
+        />
+      )}
     </>
   );
 }

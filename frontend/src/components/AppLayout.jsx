@@ -19,7 +19,17 @@ const baseNavItems = [
 ];
 
 // ============ CAMPANITA DE NOTIFICACIONES ============
-function NotificationsBell({ userId, onReassignClick }) {
+const BELL_ALERT_ACTIONS = {
+  channel_reassigned: 'Abrir canal',
+  channel_critical_change: 'Abrir canal',
+  onboarding_blocked: 'Revisar alta',
+  benchmark_signal: 'Abrir Benchmark',
+  team_risk: 'Ver equipo',
+  high_potential_movement: 'Abrir canal',
+};
+
+function NotificationsBell({ userId, onReassignClick, onBenchmarkClick }) {
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState([]);
   const [showPanel, setShowPanel] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -27,12 +37,25 @@ function NotificationsBell({ userId, onReassignClick }) {
   const unreadCount = alerts.filter(a => !a.is_read).length;
 
   useEffect(() => {
-    if (userId) loadAlerts();
+    if (!userId) return undefined;
+    loadAlerts();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadAlerts();
+    };
+    const intervalId = window.setInterval(refreshWhenVisible, 90000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [userId]);
 
   async function loadAlerts() {
     setLoading(true);
     try {
+      // La función es idempotente: materializa únicamente riesgos temporales
+      // que aún siguen vigentes y no genera recordatorios de tareas.
+      await supabase.rpc('refresh_relevant_notifications');
       const { data } = await supabase
         .from('alerts')
         .select('*')
@@ -52,6 +75,30 @@ function NotificationsBell({ userId, onReassignClick }) {
     await supabase.from('alerts').update({ is_read: true }).eq('id', alert.id);
   }
 
+  async function dismissAlert(event, alert) {
+    event.stopPropagation();
+    setAlerts(previous => previous.filter(item => item.id !== alert.id));
+    await supabase.from('alerts').update({ is_dismissed: true }).eq('id', alert.id);
+  }
+
+  async function openAlert(alert) {
+    await markAsRead(alert);
+    setShowPanel(false);
+    if (alert.alert_type === 'benchmark_signal') {
+      onBenchmarkClick?.();
+      return;
+    }
+    if (alert.alert_type === 'team_risk') {
+      navigate('/dashboard');
+      return;
+    }
+    if (alert.action_path && alert.action_path !== '/benchmark') {
+      navigate(alert.action_path);
+    } else if (alert.channel_id) {
+      navigate(`/channels?detail=${alert.channel_id}`);
+    }
+  }
+
   function timeAgo(dateStr) {
     const diffMs = Date.now() - new Date(dateStr).getTime();
     const diffMin = Math.floor(diffMs / 60000);
@@ -64,7 +111,7 @@ function NotificationsBell({ userId, onReassignClick }) {
 
   return (
     <div className="relative">
-      <button onClick={() => setShowPanel(!showPanel)}
+      <button onClick={() => { const next = !showPanel; setShowPanel(next); if (next) loadAlerts(); }}
         className="relative flex items-center justify-center w-9 h-9 rounded-xl text-text-secondary hover:bg-surface-2 transition-colors">
         <Bell size={18} />
         {unreadCount > 0 && (
@@ -76,7 +123,7 @@ function NotificationsBell({ userId, onReassignClick }) {
       {showPanel && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowPanel(false)} />
-          <div className="absolute right-0 top-11 z-50 bg-white border border-surface-3 rounded-xl shadow-lg w-80 max-h-96 overflow-y-auto">
+          <div className="absolute right-0 top-11 z-50 max-h-[70vh] w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-surface-3 bg-white shadow-lg sm:w-96">
             <div className="px-4 py-3 border-b border-surface-3">
               <span className="text-sm font-bold text-text-primary">Notificaciones</span>
             </div>
@@ -86,20 +133,33 @@ function NotificationsBell({ userId, onReassignClick }) {
               <div className="px-4 py-6 text-center text-xs text-text-muted">Sin notificaciones</div>
             ) : (
               alerts.map(a => (
-                <div key={a.id}
-                  className={`px-4 py-3 border-b border-surface-3 last:border-0 transition-colors ${
+                <div key={a.id} role="button" tabIndex={0}
+                  onClick={() => openAlert(a)}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openAlert(a); }}
+                  className={`cursor-pointer border-b border-surface-3 px-4 py-3 transition-colors last:border-0 hover:bg-surface-1 ${
                     a.is_read ? 'bg-white' : 'bg-brand-500/5'
                   }`}>
-                  <button onClick={() => markAsRead(a)} className="w-full text-left">
+                  <div className="w-full text-left">
                     <div className="flex items-start justify-between gap-2">
                       <span className={`text-xs font-semibold ${a.is_read ? 'text-text-secondary' : 'text-text-primary'}`}>{a.title}</span>
-                      {!a.is_read && <div className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0 mt-1" />}
+                      <div className="flex items-center gap-2">
+                        {!a.is_read && <div className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-500" />}
+                        <button type="button" aria-label="Descartar notificación" onClick={(event) => dismissAlert(event, a)}
+                          className="-mr-1 -mt-1 rounded-md p-1 text-text-muted hover:bg-white hover:text-text-secondary">
+                          <X size={13} />
+                        </button>
+                      </div>
                     </div>
                     {a.detail && <p className="text-[11px] text-text-secondary mt-0.5">{a.detail}</p>}
-                    <span className="text-[10px] text-text-muted mt-1 block">{timeAgo(a.created_at)}</span>
-                  </button>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-text-muted">{timeAgo(a.created_at)}</span>
+                      {BELL_ALERT_ACTIONS[a.alert_type] && (
+                        <span className="text-[10px] font-semibold text-brand-500">{BELL_ALERT_ACTIONS[a.alert_type]} →</span>
+                      )}
+                    </div>
+                  </div>
                   {a.title === 'Canales reasignados' && onReassignClick && (
-                    <button onClick={() => { markAsRead(a); onReassignClick(); }}
+                    <button onClick={(event) => { event.stopPropagation(); markAsRead(a); setShowPanel(false); onReassignClick(); }}
                       className="mt-2 text-[11px] font-semibold text-brand-500 hover:text-brand-600">
                       Repartir estos canales →
                     </button>
@@ -200,7 +260,11 @@ export function AppLayout() {
             {!showAssistant && <div className="w-1.5 h-1.5 rounded-full bg-green-500 absolute -top-0.5 -right-0.5" />}
           </button>
 
-          <NotificationsBell userId={user?.id} onReassignClick={() => setShowReassignModal(true)} />
+          <NotificationsBell
+            userId={user?.id}
+            onReassignClick={() => setShowReassignModal(true)}
+            onBenchmarkClick={() => { setShowBenchmark(true); setShowAssistant(false); }}
+          />
 
           {/* Avatar menu */}
           <div className="relative">

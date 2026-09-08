@@ -73,6 +73,8 @@ CREATE TABLE alerts (
   priority               text DEFAULT 'medium'::text,
   is_read                boolean DEFAULT false,
   is_dismissed           boolean DEFAULT false,
+  event_key              text,
+  action_path            text,
   created_at             timestamptz DEFAULT now()
 );
 

@@ -142,6 +142,15 @@ CREATE TABLE channel_notes (
   created_at             timestamptz DEFAULT now()
 );
 
+CREATE TABLE channel_copilot_messages (
+  id                     uuid NOT NULL DEFAULT gen_random_uuid(),
+  channel_id             uuid NOT NULL,
+  user_id                uuid NOT NULL,
+  role                   text NOT NULL,
+  content                text NOT NULL,
+  created_at             timestamptz DEFAULT now()
+);
+
 CREATE TABLE channel_pipeline_history (
   id                     uuid NOT NULL DEFAULT gen_random_uuid(),
   channel_id             uuid NOT NULL,

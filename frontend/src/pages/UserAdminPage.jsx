@@ -5,6 +5,7 @@ import {
   UserPlus, Users, Shield, Trash2, X, Check, Loader2,
   AlertCircle, Edit3, Mail, MapPin, ChevronDown
 } from 'lucide-react';
+import { BENCHMARK_PROFILE_LABELS, BENCHMARK_PROFILE_OPTIONS } from '../lib/benchmarkProfiles';
 
 const ROLE_OPTIONS = [
   { value: 'kam', label: 'KAM' },
@@ -18,7 +19,7 @@ const ROLE_LABELS = Object.fromEntries(ROLE_OPTIONS.map(r => [r.value, r.label])
 // ============ FORMULARIO DE ALTA ============
 function InviteUserForm({ onInvited, allUsers }) {
   const [form, setForm] = useState({
-    email: '', full_name: '', role: 'kam', zone: '', reports_to: '', phone: '', password: '',
+    email: '', full_name: '', role: 'kam', zone: '', reports_to: '', phone: '', password: '', benchmark_profile: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -62,8 +63,16 @@ function InviteUserForm({ onInvited, allUsers }) {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
+      const { data: updatedProfile, error: profileError } = await supabase.from('profiles')
+        .update({ benchmark_profile: form.benchmark_profile || null })
+        .ilike('email', form.email.trim())
+        .select('id')
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!updatedProfile) throw new Error('El usuario se ha creado, pero no se pudo asignar su perfil Benchmark. Edítalo desde la lista de usuarios.');
+
       setSuccess(`Usuario ${form.full_name} creado correctamente. Ya puede acceder al CRM con su email y la contraseña que le has asignado.`);
-      setForm({ email: '', full_name: '', role: 'kam', zone: '', reports_to: '', phone: '', password: '' });
+      setForm({ email: '', full_name: '', role: 'kam', zone: '', reports_to: '', phone: '', password: '', benchmark_profile: '' });
       onInvited();
     } catch (err) {
       setError(err.message || 'Error al crear el usuario');
@@ -104,6 +113,13 @@ function InviteUserForm({ onInvited, allUsers }) {
             <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)}
               placeholder="usuario@naturgy.com" className={fieldClass} required />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Perfil Benchmark</label>
+          <select value={form.benchmark_profile} onChange={(e) => update('benchmark_profile', e.target.value)} className={fieldClass}>
+            {BENCHMARK_PROFILE_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -156,7 +172,7 @@ function InviteUserForm({ onInvited, allUsers }) {
 // ============ FILA DE USUARIO (con edición inline) ============
 function UserRow({ user: u, allUsers, onUpdated, onDeactivated, currentUserId }) {
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ role: u.role, zone: u.zone || '', reports_to: u.reports_to || '', phone: u.phone || '' });
+  const [editForm, setEditForm] = useState({ role: u.role, zone: u.zone || '', reports_to: u.reports_to || '', phone: u.phone || '', benchmark_profile: u.benchmark_profile || '' });
   const [saving, setSaving] = useState(false);
   const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [rowError, setRowError] = useState('');
@@ -169,7 +185,7 @@ function UserRow({ user: u, allUsers, onUpdated, onDeactivated, currentUserId })
   const managerName = allUsers.find(other => other.id === u.reports_to)?.full_name;
 
   function startEdit() {
-    setEditForm({ role: u.role, zone: u.zone || '', reports_to: u.reports_to || '', phone: u.phone || '' });
+    setEditForm({ role: u.role, zone: u.zone || '', reports_to: u.reports_to || '', phone: u.phone || '', benchmark_profile: u.benchmark_profile || '' });
     setEditing(true);
     setRowError('');
   }
@@ -185,6 +201,7 @@ function UserRow({ user: u, allUsers, onUpdated, onDeactivated, currentUserId })
           zone: editForm.zone || null,
           reports_to: editForm.reports_to || null,
           phone: editForm.phone || null,
+          benchmark_profile: editForm.benchmark_profile || null,
         })
         .eq('id', u.id);
       if (error) throw error;
@@ -282,6 +299,11 @@ function UserRow({ user: u, allUsers, onUpdated, onDeactivated, currentUserId })
           <input type="tel" value={editForm.phone} onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
             placeholder="Teléfono" className={fieldClass} />
         </div>
+        <div className="mb-3">
+          <select value={editForm.benchmark_profile} onChange={(e) => setEditForm(prev => ({ ...prev, benchmark_profile: e.target.value }))} className={`${fieldClass} w-full`}>
+            {BENCHMARK_PROFILE_OPTIONS.map(option => <option key={option.value} value={option.value}>Benchmark · {option.label}</option>)}
+          </select>
+        </div>
         <div className="flex gap-2">
           <button onClick={saveEdit} disabled={saving}
             className="flex-1 py-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5">
@@ -362,6 +384,11 @@ function UserRow({ user: u, allUsers, onUpdated, onDeactivated, currentUserId })
           )}
           {managerName && (
             <div className="text-[11px] text-text-muted mt-0.5">Reporta a: {managerName}</div>
+          )}
+          {u.benchmark_profile && (
+            <div className="mt-1 inline-flex rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700">
+              Benchmark · {BENCHMARK_PROFILE_LABELS[u.benchmark_profile] || u.benchmark_profile}
+            </div>
           )}
           {u.is_active === false && (
             <div className="text-[11px] font-semibold text-red-500 mt-1">Dado de baja</div>

@@ -3,6 +3,7 @@ import { ArrowUp, FileText, Loader2, MessageSquareText, Sparkles, X } from 'luci
 import { supabase } from '../lib/supabase';
 import BenchmarkCandidateModal from './BenchmarkCandidateModal';
 import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
+import { useAuthContext } from './AuthProvider';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -30,6 +31,7 @@ function compact(value, limit = 500) {
 }
 
 export default function ChannelCopilotPanel({ open, onClose, channel }) {
+  const { profile } = useAuthContext();
   const [context, setContext] = useState('');
   const [contextStats, setContextStats] = useState({ activities: 0, meetings: 0, documents: 0 });
   const [messages, setMessages] = useState([]);
@@ -172,7 +174,7 @@ ${contextOverride}`,
           .map((text, index) => `Aportación ${index + 1} del KAM: ${text}`)
           .join('\n');
 
-        detectBenchmarkCandidate(userTranscript)
+        detectBenchmarkCandidate(userTranscript, { benchmarkProfile: profile?.benchmark_profile })
           .then(candidate => {
             if (!candidate) return;
             setBenchmarkCandidate({

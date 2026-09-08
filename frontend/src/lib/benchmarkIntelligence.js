@@ -1,3 +1,5 @@
+import { benchmarkProfileInstruction } from './benchmarkProfiles';
+
 export const DEPTH_OPTIONS = [
   { value: 'direct', label: 'Directa' },
   { value: 'analytical', label: 'Analítica' },
@@ -76,7 +78,7 @@ export function inferBenchmarkScope(query, selectedScope = 'auto') {
   if (selectedScope !== 'auto') return selectedScope;
   const normalized = normalize(query);
   const mentionsCaes = /\bcaes?\b|certificad|ahorro energetico|mwh|verificad|sujeto obligado|sujeto delegado/.test(normalized);
-  const mentionsNewBusiness = /nuevos negocios|mayorista|energia|solar|fotovolta|pyme|venta remota|comercializ/.test(normalized);
+  const mentionsNewBusiness = /nuevos negocios|mayorista|energia|comunidad solar|solar|fotovolta|residencial|venta (en )?remot|\bvr\b|comercializ/.test(normalized);
   if (mentionsCaes && !mentionsNewBusiness) return 'caes';
   if (mentionsNewBusiness && !mentionsCaes) return 'new_business';
   return 'all';
@@ -152,7 +154,7 @@ ${entry.implication ? `Implicación registrada: ${entry.implication}\n` : ''}${e
   }).join('\n\n');
 }
 
-export function buildBenchmarkSystemPrompt({ depth, audience, scope, evidenceContext, currentDate, periodDays = null }) {
+export function buildBenchmarkSystemPrompt({ depth, audience, scope, evidenceContext, currentDate, periodDays = null, benchmarkProfile = null }) {
   const scopeLabel = scope === 'caes' ? 'CAEs' : scope === 'new_business' ? 'Nuevos Negocios' : 'mercado completo y elementos transversales';
   return `Eres el analista de inteligencia comercial y competitiva de Naturgy dentro del CRM KAMSNC.
 Tu misión no es actuar como buscador ni volcar todas las menciones: debes seleccionar, contrastar, sintetizar y convertir la evidencia disponible en conocimiento útil para decidir.
@@ -162,6 +164,7 @@ FECHA ACTUAL: ${currentDate}
 ${periodDays ? `VENTANA SOLICITADA: últimos ${periodDays} días. Distingue lo nuevo de la base histórica y no repitas todo el conocimiento acumulado.` : ''}
 ${DEPTH_INSTRUCTIONS[depth] || DEPTH_INSTRUCTIONS.analytical}
 ${AUDIENCE_INSTRUCTIONS[audience] || AUDIENCE_INSTRUCTIONS.coordinator}
+${benchmarkProfileInstruction(benchmarkProfile)}
 
 JERARQUÍA DE RAZONAMIENTO
 - HECHO: consta explícitamente en una fuente fiable o está marcado como confirmado.

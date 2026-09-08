@@ -7,7 +7,7 @@ import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
 import { extractMeetingDocumentText } from '../lib/meetingDocumentText';
 
 export default function MeetingMinutes({ channelId, onChange }) {
-  const { user } = useAuthContext();
+  const { user, profile } = useAuthContext();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -99,7 +99,7 @@ export default function MeetingMinutes({ channelId, onChange }) {
 
       if (sourceContent.length >= 20 && (form.notes.trim() || documentText)) {
         try {
-          const candidate = await detectBenchmarkCandidate(sourceContent);
+          const candidate = await detectBenchmarkCandidate(sourceContent, { benchmarkProfile: profile?.benchmark_profile });
           if (candidate) {
             setBenchmarkCandidate({
               candidate,

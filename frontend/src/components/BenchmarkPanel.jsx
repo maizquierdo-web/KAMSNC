@@ -4,6 +4,7 @@ import {
   Loader2, Plus, Sparkles, X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuthContext } from './AuthProvider';
 import BenchmarkAnalysisView from './BenchmarkAnalysisView';
 import {
   BENCHMARK_DOMAINS, BENCHMARK_SECTIONS, BENCHMARK_SUBDOMAINS,
@@ -22,6 +23,7 @@ function formatDate(value) {
 }
 
 export default function BenchmarkPanel({ open, onClose }) {
+  const { profile } = useAuthContext();
   const [mode, setMode] = useState('analyze');
   const [entries, setEntries] = useState([]);
   const [rawContent, setRawContent] = useState('');
@@ -77,7 +79,7 @@ export default function BenchmarkPanel({ open, onClose }) {
     setAnalyzing(true);
     setError('');
     try {
-      setDraft(await classifyBenchmarkContribution(rawContent));
+      setDraft(await classifyBenchmarkContribution(rawContent, { benchmarkProfile: profile?.benchmark_profile }));
       setMode('review');
     } catch (analysisError) {
       console.error('Error estructurando aportación:', analysisError);
@@ -96,7 +98,7 @@ export default function BenchmarkPanel({ open, onClose }) {
       ...previous,
       domain,
       subdomain: domain === 'caes' ? 'caes' : domain === 'cross' ? 'cross' :
-        ['wholesale', 'solar', 'sme', 'remote_sales'].includes(previous.subdomain) ? previous.subdomain : 'wholesale',
+        ['wholesale', 'solar', 'residential', 'remote_sales'].includes(previous.subdomain) ? previous.subdomain : 'wholesale',
     }));
   }
 
@@ -121,7 +123,7 @@ export default function BenchmarkPanel({ open, onClose }) {
 
   if (!open) return null;
 
-  const newBusinessSubdomains = ['wholesale', 'solar', 'sme', 'remote_sales'];
+  const newBusinessSubdomains = ['wholesale', 'solar', 'residential', 'remote_sales'];
   const fieldClass = 'w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-xs text-slate-700 focus:border-teal-400 focus:outline-none';
 
   return (
@@ -146,7 +148,7 @@ export default function BenchmarkPanel({ open, onClose }) {
           </div>
         )}
 
-        {mode === 'analyze' && <BenchmarkAnalysisView entries={entries} loadingEntries={loadingEntries} />}
+        {mode === 'analyze' && <BenchmarkAnalysisView entries={entries} loadingEntries={loadingEntries} onContribute={startContribution} />}
 
         {mode === 'list' && (
           <>

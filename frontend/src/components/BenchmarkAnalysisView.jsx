@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ArrowUp, BarChart3, ChevronDown, ChevronRight, Clock3,
-  Eye, Lightbulb, Loader2, Scale, Sparkles,
+  Eye, Lightbulb, Loader2, Plus, Scale, Sparkles,
 } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import {
@@ -11,6 +11,7 @@ import {
   formatEvidenceContext, parseBenchmarkResponse, SCOPE_OPTIONS,
   selectBenchmarkEvidence,
 } from '../lib/benchmarkIntelligence';
+import { defaultScopeForBenchmarkProfile } from '../lib/benchmarkProfiles';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -70,7 +71,7 @@ const markdownComponents = {
   td: ({ children }) => <td className="border border-slate-200 px-2 py-1.5 align-top">{children}</td>,
 };
 
-export default function BenchmarkAnalysisView({ entries, loadingEntries }) {
+export default function BenchmarkAnalysisView({ entries, loadingEntries, onContribute }) {
   const { profile } = useAuthContext();
   const [depth, setDepth] = useState('analytical');
   const [scope, setScope] = useState('auto');
@@ -83,6 +84,9 @@ export default function BenchmarkAnalysisView({ entries, loadingEntries }) {
   const endRef = useRef(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
+  useEffect(() => {
+    setScope(defaultScopeForBenchmarkProfile(profile?.benchmark_profile));
+  }, [profile?.benchmark_profile]);
 
   async function askBenchmark(question, { periodDays = null } = {}) {
     const questionText = question.trim();
@@ -105,6 +109,7 @@ export default function BenchmarkAnalysisView({ entries, loadingEntries }) {
         evidenceContext: formatEvidenceContext(selectedEntries),
         currentDate: new Date().toISOString().slice(0, 10),
         periodDays,
+        benchmarkProfile: profile?.benchmark_profile,
       });
       const previousMessages = messages.slice(-6).map(message => ({
         role: message.role === 'assistant' ? 'assistant' : 'user',
@@ -137,7 +142,9 @@ export default function BenchmarkAnalysisView({ entries, loadingEntries }) {
       }]);
     } catch (requestError) {
       console.error('Error consultando Benchmark:', requestError);
-      setError(requestError.message || 'No se pudo obtener el análisis.');
+      setError(requestError instanceof TypeError
+        ? 'No se pudo conectar con el servicio de IA. Revisa la configuración del backend.'
+        : requestError.message || 'No se pudo obtener el análisis.');
     } finally {
       setLoading(false);
     }
@@ -197,6 +204,7 @@ export default function BenchmarkAnalysisView({ entries, loadingEntries }) {
 
     <div className="flex-shrink-0 border-t border-surface-3 bg-white p-3">
       <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-teal-300">
+        <button onClick={onContribute} title="Aportar información" aria-label="Aportar información al Benchmark" className="flex h-9 flex-shrink-0 items-center gap-1 rounded-lg border border-teal-200 bg-white px-2.5 text-[10px] font-bold text-teal-700 hover:bg-teal-50"><Plus size={14} /><span className="hidden sm:inline">Aportar</span></button>
         <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askBenchmark(input); }} disabled={loadingEntries || loading} placeholder="Pregunta sobre el mercado…" className="min-w-0 flex-1 bg-transparent px-2 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-50" />
         <button onClick={() => askBenchmark(input)} disabled={!input.trim() || loadingEntries || loading} className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-30"><ArrowUp size={16} /></button>
       </div>

@@ -11,7 +11,7 @@ export default function BenchmarkCandidateModal({ candidate, source, onClose, on
   const [error, setError] = useState('');
   const update = (field, value) => setDraft(previous => ({ ...previous, [field]: value }));
   const subdomains = draft.domain === 'new_business'
-    ? BENCHMARK_SUBDOMAINS.filter(option => ['wholesale', 'solar', 'sme', 'remote_sales'].includes(option.value))
+    ? BENCHMARK_SUBDOMAINS.filter(option => ['wholesale', 'solar', 'residential', 'remote_sales'].includes(option.value))
     : BENCHMARK_SUBDOMAINS.filter(option => option.value === (draft.domain === 'caes' ? 'caes' : 'cross'));
 
   function updateDomain(domain) {
@@ -19,7 +19,7 @@ export default function BenchmarkCandidateModal({ candidate, source, onClose, on
       ...previous,
       domain,
       subdomain: domain === 'caes' ? 'caes' : domain === 'cross' ? 'cross'
-        : ['wholesale', 'solar', 'sme', 'remote_sales'].includes(previous.subdomain) ? previous.subdomain : 'wholesale',
+        : ['wholesale', 'solar', 'residential', 'remote_sales'].includes(previous.subdomain) ? previous.subdomain : 'wholesale',
     }));
   }
 

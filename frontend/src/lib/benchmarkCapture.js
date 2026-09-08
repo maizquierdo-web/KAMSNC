@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { benchmarkProfileInstruction } from './benchmarkProfiles';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
@@ -10,9 +11,10 @@ export const BENCHMARK_DOMAINS = [
 
 export const BENCHMARK_SUBDOMAINS = [
   { value: 'wholesale', label: 'Mayorista' },
-  { value: 'solar', label: 'Solar' },
-  { value: 'sme', label: 'Pyme' },
-  { value: 'remote_sales', label: 'Venta Remota' },
+  { value: 'solar', label: 'Comunidades solares' },
+  { value: 'residential', label: 'Residencial' },
+  { value: 'remote_sales', label: 'Venta en Remoto (VR)' },
+  { value: 'sme', label: 'Pyme (histórico)', legacy: true },
   { value: 'caes', label: 'CAEs' },
   { value: 'cross', label: 'Transversal' },
 ];
@@ -58,12 +60,22 @@ Reglas:
 - confidence mide la claridad de la extracción, no la veracidad.
 - Si no hay información relevante, is_relevant debe ser false y el resto puede quedar vacío.
 
-Dominios: new_business, caes, cross.
-Subdominios: wholesale, solar, sme, remote_sales, caes, cross.
+Dominios:
+- caes: Certificados de Ahorro Energético.
+- new_business: Comunidades solares, Mayorista, Residencial o Venta en Remoto.
+- cross: solo cuando la misma información afecta explícitamente a ambos dominios.
+
+Subdominios para nuevas aportaciones:
+- caes: CAEs.
+- solar: Comunidades solares.
+- wholesale: Mayorista.
+- residential: Residencial.
+- remote_sales: Venta en Remoto (VR).
+- cross: información verdaderamente transversal.
 Secciones: general, value_proposition, products_services, commercial_model, operations, technology, incentives, communication, strengths, weaknesses, risks, opportunities, economic_conditions, organization_capabilities.
 
 Responde exclusivamente con JSON válido:
-{"is_relevant":true,"domain":"new_business|caes|cross","subdomain":"wholesale|solar|sme|remote_sales|caes|cross","section":"general|value_proposition|products_services|commercial_model|operations|technology|incentives|communication|strengths|weaknesses|risks|opportunities|economic_conditions|organization_capabilities","competitor_name":"","statement":"","confidence":0,"implication":"","recommended_action":"","tags":[]}`;
+{"is_relevant":true,"domain":"new_business|caes|cross","subdomain":"wholesale|solar|residential|remote_sales|caes|cross","section":"general|value_proposition|products_services|commercial_model|operations|technology|incentives|communication|strengths|weaknesses|risks|opportunities|economic_conditions|organization_capabilities","competitor_name":"","statement":"","confidence":0,"implication":"","recommended_action":"","tags":[]}`;
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -89,14 +101,14 @@ function normalizeCandidate(parsed) {
   };
 }
 
-export async function detectBenchmarkCandidate(rawContent) {
+export async function detectBenchmarkCandidate(rawContent, { benchmarkProfile = null } = {}) {
   const content = clean(rawContent).slice(0, 18000);
   if (content.length < 20) return null;
   const response = await fetch(`${BACKEND_URL}/api/assistant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      system: DETECTION_PROMPT,
+      system: `${DETECTION_PROMPT}\n\n${benchmarkProfileInstruction(benchmarkProfile)}`,
       messages: [{ role: 'user', content }],
     }),
   });
@@ -112,13 +124,15 @@ export async function detectBenchmarkCandidate(rawContent) {
 // La aportación directa ya ha sido declarada relevante por el usuario. Reutiliza
 // el mismo clasificador que actas y conversaciones y conserva el texto original
 // si el detector resulta demasiado conservador.
-export async function classifyBenchmarkContribution(rawContent) {
+export async function classifyBenchmarkContribution(rawContent, options = {}) {
   const content = clean(rawContent);
-  const candidate = await detectBenchmarkCandidate(content);
+  const candidate = await detectBenchmarkCandidate(content, options);
+  const fallbackDomain = options.benchmarkProfile === 'caes' ? 'caes'
+    : options.benchmarkProfile === 'new_business' ? 'new_business' : 'cross';
   return candidate || {
     is_relevant: true,
-    domain: 'cross',
-    subdomain: 'cross',
+    domain: fallbackDomain,
+    subdomain: fallbackDomain === 'caes' ? 'caes' : fallbackDomain === 'new_business' ? 'wholesale' : 'cross',
     section: 'general',
     competitor_name: '',
     statement: content,

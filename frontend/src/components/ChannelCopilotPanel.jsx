@@ -47,7 +47,7 @@ function compact(value, limit = 500) {
 }
 
 export default function ChannelCopilotPanel({ open, onClose, channel }) {
-  const { profile } = useAuthContext();
+  const { profile, user } = useAuthContext();
   const desktopPanelLayout = useDesktopPanelLayout();
   const [context, setContext] = useState('');
   const [contextStats, setContextStats] = useState({ activities: 0, meetings: 0, documents: 0 });
@@ -58,6 +58,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   const [error, setError] = useState('');
   const [benchmarkCandidate, setBenchmarkCandidate] = useState(null);
   const [benchmarkNotice, setBenchmarkNotice] = useState('');
+  const [memoryNotice, setMemoryNotice] = useState('');
   const endRef = useRef(null);
 
   useEffect(() => {
@@ -67,6 +68,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
     setError('');
     setBenchmarkCandidate(null);
     setBenchmarkNotice('');
+    setMemoryNotice('');
     loadContext();
   }, [open, channel?.id]);
 
@@ -75,7 +77,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   async function loadContext() {
     setLoadingContext(true);
     try {
-      const [classRes, interactionsRes, visitsRes, notesRes, meetingsRes, historyRes, businessCaseRes, profileRes] = await Promise.all([
+      const [classRes, interactionsRes, visitsRes, notesRes, meetingsRes, historyRes, businessCaseRes, profileRes, memoryRes] = await Promise.all([
         supabase.from('channel_classifications').select('custom_text, channel_classification(canal, subcanal, tipo)').eq('channel_id', channel.id),
         supabase.from('channel_interactions').select('interaction_type, direction, subject, notes, result, contact_person, created_at, planned_date, planned_time, is_completed').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(20),
         supabase.from('visits').select('checkin_at, result, objective, notes, next_steps, next_action_date').eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(10),
@@ -84,6 +86,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
         supabase.from('channel_pipeline_history').select('from_stage, to_stage, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
         supabase.from('business_cases').select('file_name, updated_at').eq('channel_id', channel.id).maybeSingle(),
         supabase.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
+        supabase.from('channel_copilot_messages').select('id, role, content, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(40),
       ]);
 
       const classifications = (classRes.data || []).map(item => {
@@ -97,6 +100,19 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
       const history = historyRes.data || [];
       const businessCase = businessCaseRes.data;
       const responsible = profileRes.data;
+      const savedMessages = memoryRes.error ? [] : (memoryRes.data || []).reverse().map(message => ({
+        id: message.id,
+        role: message.role,
+        text: message.content,
+        persisted: true,
+      }));
+
+      if (memoryRes.error) {
+        console.warn('No se pudo cargar la memoria del copiloto:', memoryRes.error);
+        setMemoryNotice('La memoria persistente no está disponible.');
+      } else if (savedMessages.length) {
+        setMemoryNotice(`${savedMessages.length} mensajes recuperados de la memoria del canal.`);
+      }
 
       const completedInteractions = interactions.filter(item => item.is_completed === true || (item.is_completed !== false && !item.planned_date));
       const plannedInteractions = interactions.filter(item => item.planned_date && item.is_completed !== true);
@@ -142,7 +158,8 @@ ${businessCase ? `Adjunto: ${businessCase.file_name} · Actualizado: ${dateLabel
         meetings: meetings.length,
         documents: (businessCase ? 1 : 0) + meetings.filter(item => item.file_name).length,
       });
-      await askCopilot('Resume el estado actual del canal en un máximo de cuatro frases e indica el siguiente paso más importante.', contextText, true);
+      setMessages(savedMessages);
+      await askCopilot('Resume el estado actual del canal en un máximo de cuatro frases e indica el siguiente paso más importante.', contextText, true, savedMessages);
     } catch (contextError) {
       console.error('Error cargando contexto del canal:', contextError);
       setError('No se pudo cargar todo el contexto del canal.');
@@ -151,14 +168,34 @@ ${businessCase ? `Adjunto: ${businessCase.file_name} · Actualizado: ${dateLabel
     }
   }
 
-  async function askCopilot(question, contextOverride = context, isInitial = false) {
+  async function persistMessage(role, content) {
+    if (!user?.id) throw new Error('No se ha identificado al usuario');
+    const { error: persistenceError } = await supabase.from('channel_copilot_messages').insert({
+      channel_id: channel.id,
+      user_id: user.id,
+      role,
+      content: content.trim(),
+    });
+    if (persistenceError) throw persistenceError;
+  }
+
+  async function askCopilot(question, contextOverride = context, isInitial = false, historyOverride = messages) {
     if (!question.trim() || loading) return;
-    if (!isInitial) setMessages(previous => [...previous, { role: 'user', text: question }]);
-    setInput('');
     setLoading(true);
+    if (!isInitial) {
+      setMessages(previous => [...previous, { role: 'user', text: question }]);
+      try {
+        await persistMessage('user', question);
+        setMemoryNotice('La conversación está guardada en la memoria del canal.');
+      } catch (persistenceError) {
+        console.warn('No se pudo guardar la aportación en la memoria del copiloto:', persistenceError);
+        setMemoryNotice('El mensaje se ha enviado, pero no se pudo guardar en la memoria.');
+      }
+    }
+    setInput('');
     setError('');
     try {
-      const previousMessages = messages.slice(-6).map(message => ({
+      const previousMessages = historyOverride.filter(message => !message.initial).slice(-20).map(message => ({
         role: message.role === 'assistant' ? 'assistant' : 'user', content: message.text,
       }));
       const response = await fetch(`${BACKEND_URL}/api/assistant`, {
@@ -168,6 +205,7 @@ ${businessCase ? `Adjunto: ${businessCase.file_name} · Actualizado: ${dateLabel
           system: `Eres el copiloto comercial de una ficha de canal del CRM de Naturgy. Responde en español, con precisión y de forma práctica.
 Usa EXCLUSIVAMENTE el contexto proporcionado. No inventes datos, acuerdos, fechas ni riesgos. Si falta información, dilo claramente.
 Prioriza: situación actual, pendientes, siguiente acción concreta y preparación comercial. Sé conciso salvo que el usuario pida un correo o un guion completo.
+La conversación previa es memoria persistente de este canal. Puedes usar la información aportada por los usuarios en ella, pero no conviertas tus propias respuestas anteriores en hechos si no estaban respaldadas por el usuario o por la ficha.
 
 CONTEXTO DEL CANAL:
 ${contextOverride}`,
@@ -179,6 +217,15 @@ ${contextOverride}`,
       const answer = data.content?.map(item => item.text || '').join('').trim();
       if (!answer) throw new Error('El asistente no devolvió una respuesta');
       setMessages(previous => [...previous, { role: 'assistant', text: answer, initial: isInitial }]);
+
+      if (!isInitial) {
+        try {
+          await persistMessage('assistant', answer);
+        } catch (persistenceError) {
+          console.warn('No se pudo guardar la respuesta en la memoria del copiloto:', persistenceError);
+          setMemoryNotice('La respuesta no se pudo guardar en la memoria del canal.');
+        }
+      }
 
       // El resumen automático no es una aportación del usuario. En el resto de la
       // conversación analizamos únicamente lo escrito por el KAM, nunca la respuesta
@@ -243,6 +290,9 @@ ${contextOverride}`,
           {benchmarkNotice && (
             <div className="mt-2 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-2 text-[10px] text-teal-700">{benchmarkNotice}</div>
           )}
+          {memoryNotice && (
+            <div className="mt-2 text-[9px] text-slate-500">{memoryNotice}</div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
@@ -280,7 +330,7 @@ ${contextOverride}`,
           <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-navy-300">
             <FileText size={15} className="ml-2 flex-shrink-0 text-slate-400" />
             <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askCopilot(input); }}
-              disabled={loadingContext || loading} placeholder="Pregunta sobre este canal…"
+              disabled={loadingContext || loading} placeholder="Pregunta o añade información sobre este canal"
               className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-50" />
             <button onClick={() => askCopilot(input)} disabled={!input.trim() || loadingContext || loading}
               className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-navy-500 text-white hover:bg-navy-600 disabled:opacity-30"><ArrowUp size={16} /></button>

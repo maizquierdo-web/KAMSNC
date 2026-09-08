@@ -13,6 +13,8 @@ SET search_path = public
 AS $$
 DECLARE
   requester_id uuid := auth.uid();
+  requester_can_manage boolean := false;
+  updated_channel_id uuid;
 BEGIN
   IF requester_id IS NULL THEN
     RAISE EXCEPTION 'Usuario no autenticado';
@@ -28,31 +30,52 @@ BEGIN
     RAISE EXCEPTION 'El responsable seleccionado no es válido';
   END IF;
 
-  IF NOT EXISTS (
+  WITH RECURSIVE team_ids AS (
+    SELECT p.id
+    FROM public.profiles p
+    WHERE p.reports_to = requester_id
+      AND p.is_active = true
+
+    UNION
+
+    SELECT p.id
+    FROM public.profiles p
+    JOIN team_ids team_member ON p.reports_to = team_member.id
+    WHERE p.is_active = true
+  )
+  SELECT EXISTS (
     SELECT 1
     FROM public.channels c
     WHERE c.id = target_channel_id
       AND (
         c.assigned_to = requester_id
-        OR c.assigned_to IN (SELECT public.get_team_ids(requester_id))
-        OR EXISTS (
-          SELECT 1 FROM public.profiles p
-          WHERE p.id = requester_id AND p.role = 'director'
-        )
+        OR c.assigned_to IN (SELECT id FROM team_ids)
       )
-  ) THEN
+  ) OR EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = requester_id
+      AND p.is_active = true
+      AND (p.role = 'director' OR p.can_manage_users = true)
+  )
+  INTO requester_can_manage;
+
+  IF NOT requester_can_manage THEN
     RAISE EXCEPTION 'No tienes permiso para reasignar este canal';
   END IF;
 
   UPDATE public.channels
   SET assigned_to = target_assignee_id,
       updated_at = now()
-  WHERE id = target_channel_id;
+  WHERE id = target_channel_id
+  RETURNING id INTO updated_channel_id;
 
-  RETURN target_channel_id;
+  IF updated_channel_id IS NULL THEN
+    RAISE EXCEPTION 'El canal indicado no existe';
+  END IF;
+
+  RETURN updated_channel_id;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.reassign_channel_open(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reassign_channel_open(uuid, uuid) TO authenticated;
-

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUp, FileText, Loader2, MessageSquareText, Sparkles, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import BenchmarkCandidateModal from './BenchmarkCandidateModal';
@@ -6,6 +7,7 @@ import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
 import { useAuthContext } from './AuthProvider';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
+const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
 
 const SUGGESTIONS = [
   '¿Qué debo hacer ahora?',
@@ -20,6 +22,20 @@ const TYPE_LABELS = {
   linkedin: 'LinkedIn', other: 'Acción', visit: 'Visita',
 };
 
+function useDesktopPanelLayout() {
+  const [matches, setMatches] = useState(() => window.matchMedia(DESKTOP_PANEL_QUERY).matches);
+
+  useEffect(() => {
+    const query = window.matchMedia(DESKTOP_PANEL_QUERY);
+    const update = () => setMatches(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  return matches;
+}
+
 function dateLabel(value) {
   if (!value) return '-';
   return new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -32,6 +48,7 @@ function compact(value, limit = 500) {
 
 export default function ChannelCopilotPanel({ open, onClose, channel }) {
   const { profile } = useAuthContext();
+  const desktopPanelLayout = useDesktopPanelLayout();
   const [context, setContext] = useState('');
   const [contextStats, setContextStats] = useState({ activities: 0, meetings: 0, documents: 0 });
   const [messages, setMessages] = useState([]);
@@ -203,7 +220,7 @@ ${contextOverride}`,
   const initialSummary = messages.find(message => message.initial);
   const conversation = messages.filter(message => !message.initial);
 
-  return (
+  const panel = (
     <>
       <button aria-label="Cerrar copiloto" onClick={onClose} className="channel-copilot-backdrop fixed inset-0 z-40 bg-slate-950/15" />
       <aside className="channel-copilot-panel flex min-h-0 flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl">
@@ -280,4 +297,6 @@ ${contextOverride}`,
       )}
     </>
   );
+
+  return desktopPanelLayout ? panel : createPortal(panel, document.body);
 }

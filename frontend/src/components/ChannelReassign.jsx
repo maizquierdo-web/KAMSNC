@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
 import { Users, ChevronDown, Check, Loader2, ArrowRightLeft, X } from 'lucide-react';
@@ -188,7 +189,7 @@ export function BulkReassignModal({ onClose, onDone, initialFromKam }) {
   const STAGE_LABELS = { lead: 'Lead', first_contact: 'Contacto', proposal: 'Propuesta', negotiation: 'Negociación', onboarding: 'Alta', active: 'Activo' };
 
   if (result) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl w-full max-w-md p-6 text-center">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -203,11 +204,12 @@ export function BulkReassignModal({ onClose, onDone, initialFromKam }) {
             Cerrar
           </button>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-surface-3">
@@ -303,6 +305,7 @@ export function BulkReassignModal({ onClose, onDone, initialFromKam }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

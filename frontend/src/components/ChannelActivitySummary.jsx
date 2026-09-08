@@ -51,6 +51,7 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
   const [reassignOpen, setReassignOpen] = useState(false);
   const [reassigning, setReassigning] = useState(false);
   const [reassignError, setReassignError] = useState('');
+  const [reassignSuccess, setReassignSuccess] = useState(false);
   const [actionOpen, setActionOpen] = useState(false);
   const [actionForm, setActionForm] = useState({ type: 'call', date: '', time: '09:00', detail: '' });
   const [savingAction, setSavingAction] = useState(false);
@@ -122,6 +123,7 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
     if (!kam || kam.id === channel.assigned_to) { setReassignOpen(false); return; }
     setReassigning(true);
     setReassignError('');
+    setReassignSuccess(false);
     try {
       const { data, error } = await supabase.rpc('reassign_channel_open', {
         target_channel_id: channel.id,
@@ -131,10 +133,13 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
       if (data !== channel.id) throw new Error('No se pudo completar la reasignación');
       setSummary(prev => ({ ...prev, responsible: kam.full_name, responsibleZone: kam.zone }));
       setReassignOpen(false);
+      setReassignSuccess(true);
       onReassigned?.(kam.id, kam);
+      window.setTimeout(() => setReassignSuccess(false), 2500);
     } catch (error) {
       console.error('Error reasignando canal:', error);
-      setReassignError('No se pudo cambiar el responsable. Inténtalo de nuevo.');
+      const detail = error?.message?.trim();
+      setReassignError(detail || 'No se pudo cambiar el responsable. Inténtalo de nuevo.');
     } finally {
       setReassigning(false);
     }
@@ -350,10 +355,11 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
           <div className="truncate text-sm font-bold text-text-primary">{summary.responsible}</div>
           {summary.responsibleZone && <div className="mt-0.5 text-[10px] text-text-muted">Zona {summary.responsibleZone}</div>}
         </div>
-        <button onClick={() => { setReassignOpen(open => !open); setReassignError(''); }} disabled={reassigning}
-            title="Cambiar KAM responsable"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-surface-3 bg-white text-text-secondary transition-colors hover:bg-surface-2 disabled:opacity-50">
+        <button onClick={() => { setReassignOpen(open => !open); setReassignError(''); setReassignSuccess(false); }} disabled={reassigning}
+            title={reassignSuccess ? 'Responsable actualizado' : 'Cambiar KAM responsable'}
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border bg-white transition-colors disabled:opacity-50 ${reassignSuccess ? 'border-emerald-200 text-emerald-600' : 'border-surface-3 text-text-secondary hover:bg-surface-2'}`}>
             {reassigning ? <Loader2 size={14} className="animate-spin" />
+              : reassignSuccess ? <Check size={14} />
               : reassignOpen ? <ChevronDown size={14} className="rotate-180" /> : <ArrowRightLeft size={14} />}
         </button>
 

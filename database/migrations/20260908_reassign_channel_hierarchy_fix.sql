@@ -1,7 +1,3 @@
--- Reasignación horizontal de canales.
--- Un usuario autenticado puede reasignar un canal que tiene asignado o que
--- pertenece a su equipo, hacia un KAM o responsable de coordinación activo.
-
 CREATE OR REPLACE FUNCTION public.reassign_channel_open(
   target_channel_id uuid,
   target_assignee_id uuid
@@ -22,40 +18,44 @@ BEGIN
 
   IF NOT EXISTS (
     SELECT 1
-    FROM public.profiles p
-    WHERE p.id = target_assignee_id
-      AND p.is_active = true
-      AND p.role IN ('kam', 'coordinator', 'manager')
+    FROM public.profiles profile
+    WHERE profile.id = target_assignee_id
+      AND profile.is_active = true
+      AND profile.role IN ('kam', 'coordinator', 'manager')
   ) THEN
     RAISE EXCEPTION 'El responsable seleccionado no es válido';
   END IF;
 
   WITH RECURSIVE team_ids AS (
-    SELECT p.id
-    FROM public.profiles p
-    WHERE p.reports_to = requester_id
-      AND p.is_active = true
+    SELECT profile.id
+    FROM public.profiles profile
+    WHERE profile.reports_to = requester_id
+      AND profile.is_active = true
 
     UNION
 
-    SELECT p.id
-    FROM public.profiles p
-    JOIN team_ids team_member ON p.reports_to = team_member.id
-    WHERE p.is_active = true
+    SELECT profile.id
+    FROM public.profiles profile
+    JOIN team_ids team_member ON profile.reports_to = team_member.id
+    WHERE profile.is_active = true
   )
   SELECT EXISTS (
     SELECT 1
-    FROM public.channels c
-    WHERE c.id = target_channel_id
+    FROM public.channels channel
+    WHERE channel.id = target_channel_id
       AND (
-        c.assigned_to = requester_id
-        OR c.assigned_to IN (SELECT id FROM team_ids)
+        channel.assigned_to = requester_id
+        OR channel.assigned_to IN (SELECT id FROM team_ids)
       )
   ) OR EXISTS (
-    SELECT 1 FROM public.profiles p
-    WHERE p.id = requester_id
-      AND p.is_active = true
-      AND (p.role = 'director' OR p.can_manage_users = true)
+    SELECT 1
+    FROM public.profiles profile
+    WHERE profile.id = requester_id
+      AND profile.is_active = true
+      AND (
+        profile.role = 'director'
+        OR profile.can_manage_users = true
+      )
   )
   INTO requester_can_manage;
 
@@ -79,3 +79,6 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reassign_channel_open(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reassign_channel_open(uuid, uuid) TO authenticated;
+
+COMMENT ON FUNCTION public.reassign_channel_open(uuid, uuid) IS
+  'Reasigna un canal propio o de la jerarquía del usuario sin depender de funciones auxiliares.';

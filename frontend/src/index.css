@@ -50,6 +50,45 @@
     padding-bottom: env(safe-area-inset-bottom);
     background-color: #ffffff;
   }
+
+  /* El copiloto solo se integra como columna en un escritorio real. En móviles
+     con "sitio de escritorio" o zoom reducido, el ancho deja de ser fiable;
+     el puntero táctil mantiene el panel completo y evita recortar cabecera y chat. */
+  .channel-copilot-panel {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 50;
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .channel-copilot-composer {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
+    .channel-copilot-panel {
+      width: 440px;
+    }
+  }
+
+  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+    .channel-copilot-backdrop {
+      display: none;
+    }
+
+    .channel-copilot-panel {
+      position: sticky;
+      top: 1rem;
+      z-index: 0;
+      width: 100%;
+      height: calc(100vh - 120px);
+      border: 1px solid #dde1e8;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+    }
+  }
 }
 
 @layer utilities {

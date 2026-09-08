@@ -105,13 +105,18 @@ function ChannelList({ channels, loading, onSelect, filter, setFilter, search, s
     })),
   ];
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const normalizedPhoneSearch = search.replace(/\D/g, '');
+
   const filtered = channels
     .filter(c => filter === 'all' || c.status === filter)
     .filter(c =>
-      search === '' ||
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.contact_name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (c.city || '').toLowerCase().includes(search.toLowerCase())
+      normalizedSearch === '' ||
+      c.name.toLowerCase().includes(normalizedSearch) ||
+      (c.contact_name || '').toLowerCase().includes(normalizedSearch) ||
+      (c.city || '').toLowerCase().includes(normalizedSearch) ||
+      (c.email || '').toLowerCase().includes(normalizedSearch) ||
+      (normalizedPhoneSearch !== '' && (c.phone || '').replace(/\D/g, '').includes(normalizedPhoneSearch))
     );
 
   return (
@@ -149,7 +154,7 @@ function ChannelList({ channels, loading, onSelect, filter, setFilter, search, s
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar canal, contacto o ciudad..."
+          placeholder="Buscar canal, contacto, ciudad, teléfono o email..."
           className="w-full pl-9 pr-4 py-2.5 bg-surface-2 border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 transition-colors"
         />
         {search && (

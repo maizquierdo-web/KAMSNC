@@ -205,9 +205,9 @@ ${contextOverride}`,
 
   return (
     <>
-      <button aria-label="Cerrar copiloto" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/15 lg:hidden" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex h-[100dvh] min-h-0 w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[440px] lg:sticky lg:top-4 lg:z-0 lg:h-[calc(100vh-120px)] lg:w-full lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-sm">
-        <div className="flex items-start justify-between border-b border-navy-100 bg-navy-50 px-4 py-4">
+      <button aria-label="Cerrar copiloto" onClick={onClose} className="channel-copilot-backdrop fixed inset-0 z-40 bg-slate-950/15" />
+      <aside className="channel-copilot-panel flex min-h-0 flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl">
+        <div className="relative z-10 flex flex-shrink-0 items-start justify-between border-b border-navy-100 bg-navy-50 px-4 py-4">
           <div className="flex gap-2.5">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-navy-100 text-navy-600"><Sparkles size={18} /></div>
             <div><h2 className="text-base font-extrabold text-slate-800">Copiloto del canal</h2><p className="mt-0.5 text-[10px] text-slate-500">Contexto: {channel.name}</p></div>
@@ -215,7 +215,7 @@ ${contextOverride}`,
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"><X size={18} /></button>
         </div>
 
-        <div className="border-b border-surface-3 bg-white px-4 py-3">
+        <div className="flex-shrink-0 border-b border-surface-3 bg-white px-4 py-3">
           <div className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-navy-600"><span className="h-1.5 w-1.5 rounded-full bg-navy-500" /> Contexto cargado</div>
           <div className="flex flex-wrap gap-1.5">
             <span className="rounded-md border border-surface-3 bg-surface-1 px-2 py-1 text-[9px] text-slate-600">Ficha del canal</span>
@@ -259,7 +259,7 @@ ${contextOverride}`,
           </div>
         </div>
 
-        <div className="flex-shrink-0 border-t border-surface-3 bg-white p-3">
+        <div className="channel-copilot-composer flex-shrink-0 border-t border-surface-3 bg-white p-3">
           <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-navy-300">
             <FileText size={15} className="ml-2 flex-shrink-0 text-slate-400" />
             <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askCopilot(input); }}

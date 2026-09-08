@@ -204,7 +204,7 @@ ${contextOverride}`,
   return (
     <>
       <button aria-label="Cerrar copiloto" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/15 lg:hidden" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[440px] lg:sticky lg:top-4 lg:z-0 lg:h-[calc(100vh-120px)] lg:w-full lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-sm">
+      <aside className="fixed inset-y-0 right-0 z-50 flex h-[100dvh] min-h-0 w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[440px] lg:sticky lg:top-4 lg:z-0 lg:h-[calc(100vh-120px)] lg:w-full lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-sm">
         <div className="flex items-start justify-between border-b border-navy-100 bg-navy-50 px-4 py-4">
           <div className="flex gap-2.5">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-navy-100 text-navy-600"><Sparkles size={18} /></div>
@@ -226,7 +226,7 @@ ${contextOverride}`,
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           {loadingContext && !initialSummary ? (
             <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-white p-4 text-xs text-slate-500"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
           ) : initialSummary && (
@@ -257,7 +257,7 @@ ${contextOverride}`,
           </div>
         </div>
 
-        <div className="border-t border-surface-3 bg-white p-3">
+        <div className="flex-shrink-0 border-t border-surface-3 bg-white p-3">
           <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-navy-300">
             <FileText size={15} className="ml-2 flex-shrink-0 text-slate-400" />
             <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askCopilot(input); }}

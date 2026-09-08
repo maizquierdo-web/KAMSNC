@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import {
   BarChart3,
@@ -10,6 +11,7 @@ import {
   Loader2,
   MapPin,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuthContext } from '../components/AuthProvider';
 import { supabase } from '../lib/supabase';
@@ -140,6 +142,8 @@ function classificationLabel(item) {
 
 export default function ExportPage() {
   const { user, profile, isManager } = useAuthContext();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [dataset, setDataset] = useState('channels');
   const [format, setFormat] = useState('xlsx');
   const [selectedFields, setSelectedFields] = useState(DEFAULT_FIELDS.channels);
@@ -304,14 +308,25 @@ export default function ExportPage() {
 
   const currentDataset = DATASETS.find(item => item.id === dataset);
 
+  function closeExport() {
+    const returnTo = location.state?.returnTo;
+    navigate(returnTo && returnTo !== '/export' ? returnTo : '/home', { replace: true });
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="mb-5 flex items-center gap-2.5">
-        <FileSpreadsheet size={20} className="text-brand-500" />
-        <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-text-primary">Extraer datos</h1>
-          <p className="mt-0.5 text-xs text-text-secondary">Selecciona el contenido y descarga el resultado en Excel o CSV</p>
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <FileSpreadsheet size={20} className="text-brand-500" />
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-text-primary">Extraer datos</h1>
+            <p className="mt-0.5 text-xs text-text-secondary">Selecciona el contenido y descarga el resultado en Excel o CSV</p>
+          </div>
         </div>
+        <button onClick={closeExport} title="Cerrar" aria-label="Cerrar extracción de datos"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary">
+          <X size={19} />
+        </button>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">

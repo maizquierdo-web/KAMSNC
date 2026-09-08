@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Building2, BarChart3, Trophy, Sparkles, CalendarDays, X, Bell, Database, Download } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import { useState, useEffect, lazy, Suspense } from 'react';
@@ -117,6 +117,7 @@ function NotificationsBell({ userId, onReassignClick }) {
 export function AppLayout() {
   const { user, profile, signOut, isManager } = useAuthContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
@@ -164,7 +165,13 @@ export function AppLayout() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Configurable data export */}
           <button
-            onClick={() => { navigate('/export'); setShowAssistant(false); setShowBenchmark(false); }}
+            onClick={() => {
+              if (location.pathname !== '/export') {
+                navigate('/export', { state: { returnTo: `${location.pathname}${location.search}` } });
+              }
+              setShowAssistant(false);
+              setShowBenchmark(false);
+            }}
             title="Extraer datos"
             aria-label="Extraer datos"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-surface-3 bg-white text-text-secondary transition-all hover:bg-surface-1 sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2"

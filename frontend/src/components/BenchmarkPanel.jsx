@@ -127,7 +127,7 @@ export default function BenchmarkPanel({ open, onClose }) {
   return (
     <>
       <button aria-label="Cerrar Benchmark" onClick={onClose} className="fixed inset-0 z-40 bg-slate-950/20" />
-      <aside className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[500px]">
+      <aside className="fixed inset-y-0 right-0 z-50 flex h-[100dvh] min-h-0 w-full flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl sm:w-[500px]">
         <div className="flex items-start justify-between border-b border-teal-100 bg-[#eaf7f5] px-4 py-4">
           <div className="flex gap-2.5">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100 text-teal-700"><Database size={18} /></div>

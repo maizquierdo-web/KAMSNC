@@ -244,13 +244,13 @@ export function AppLayout() {
 
       {/* Assistant overlay */}
       {showAssistant && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-surface-0" style={{ top: 56 }}>
+        <div className="fixed inset-x-0 bottom-0 z-50 flex min-h-0 flex-col bg-surface-0" style={{ top: 56, height: 'calc(100dvh - 56px)' }}>
           <Suspense fallback={
             <div className="flex items-center justify-center flex-1">
               <div className="animate-spin text-brand-500"><Sparkles size={24} /></div>
             </div>
           }>
-            <div className="flex-1 overflow-hidden px-4 pt-4 pb-4">
+            <div className="min-h-0 flex-1 overflow-hidden px-4 pb-4 pt-4">
               <AssistantPage />
             </div>
           </Suspense>

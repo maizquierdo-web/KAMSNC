@@ -491,7 +491,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2.5 mb-3">
         <div className="w-9 h-9 rounded-xl bg-brand-500/10 flex items-center justify-center">
           <Sparkles size={18} className="text-brand-500" />
@@ -502,7 +502,7 @@ export default function AssistantPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-4 pb-2">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-2">
         {messages.map((msg, i) => <MessageBubble key={i} message={msg} />)}
         {loading && (
           <div className="flex gap-2.5">
@@ -522,7 +522,7 @@ export default function AssistantPage() {
         ))}
       </div>
 
-      <div className="flex items-center gap-2 pt-2 border-t border-surface-3">
+      <div className="flex flex-shrink-0 items-center gap-2 border-t border-surface-3 pt-2">
         <button onClick={toggleVoice}
           className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${listening ? 'bg-red-500 text-white animate-pulse' : 'bg-surface-2 text-text-muted hover:bg-surface-3'}`}>
           {listening ? <MicOff size={18} /> : <Mic size={18} />}

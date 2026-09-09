@@ -248,6 +248,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const { user } = useAuthContext();
   const [channel, setChannel] = useState(null);
   const [classifications, setClassifications] = useState([]);
+  const [editClassifications, setEditClassifications] = useState([]);
+  const [classificationError, setClassificationError] = useState('');
+  const [classificationRefreshKey, setClassificationRefreshKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -320,8 +323,68 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
 
   function startEdit() {
     initForm(channel);
+    setEditClassifications(classifications.map(item => ({
+      classification_id: item.classification_id,
+      canal: item.channel_classification?.canal || '',
+      custom_text: item.custom_text || null,
+    })));
     setEditMode(true);
     setEditError('');
+    setClassificationError('');
+  }
+
+  async function saveClassifications() {
+    const selectedIds = new Set(editClassifications.map(item => item.classification_id));
+    const currentByClassification = new Map(classifications.map(item => [item.classification_id, item]));
+    const removedIds = classifications
+      .filter(item => !selectedIds.has(item.classification_id))
+      .map(item => item.id);
+    const added = editClassifications
+      .filter(item => !currentByClassification.has(item.classification_id))
+      .map(item => ({
+        channel_id: channelId,
+        classification_id: item.classification_id,
+        custom_text: item.custom_text || null,
+      }));
+
+    const changed = editClassifications.filter(item => {
+      const current = currentByClassification.get(item.classification_id);
+      return current && (current.custom_text || null) !== (item.custom_text || null);
+    });
+
+    let mutationError = null;
+    try {
+      if (removedIds.length > 0) {
+        const { error } = await supabase.from('channel_classifications').delete().in('id', removedIds);
+        if (error) throw error;
+      }
+
+      if (added.length > 0) {
+        const { error } = await supabase.from('channel_classifications').insert(added);
+        if (error) throw error;
+      }
+
+      for (const item of changed) {
+        const current = currentByClassification.get(item.classification_id);
+        const { error } = await supabase
+          .from('channel_classifications')
+          .update({ custom_text: item.custom_text || null })
+          .eq('id', current.id);
+        if (error) throw error;
+      }
+    } catch (err) {
+      mutationError = err;
+    }
+
+    const { data, error: reloadError } = await supabase
+      .from('channel_classifications')
+      .select('*, channel_classification(*)')
+      .eq('channel_id', channelId);
+    if (reloadError) throw reloadError;
+
+    setClassifications(data || []);
+    setClassificationRefreshKey(key => key + 1);
+    if (mutationError) throw mutationError;
   }
 
   async function saveEdit() {
@@ -331,6 +394,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
     }
     setSaving(true);
     setEditError('');
+    setClassificationError('');
     try {
       const now = new Date().toISOString();
       const stageChanged = editForm.pipeline_stage !== channel.pipeline_stage;
@@ -370,6 +434,12 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       }
 
       setChannel(prev => ({ ...prev, ...editForm, name: editForm.name.trim(), status: stageToStatus(editForm.pipeline_stage) }));
+      try {
+        await saveClassifications();
+      } catch (err) {
+        setClassificationError(`No se pudo guardar la clasificación: ${err.message || 'inténtalo de nuevo'}`);
+        return;
+      }
       setEditMode(false);
     } catch (err) {
       setEditError(err.message || 'Error al guardar');
@@ -443,6 +513,16 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   Estado derivado: <span className="font-semibold">{STATUS_CONFIG[stageToStatus(editForm.pipeline_stage)]?.label}</span>
                 </p>
               </div>
+
+              <ClassificationSelector
+                value={editClassifications}
+                onChange={(value) => {
+                  setEditClassifications(value);
+                  setClassificationError('');
+                }}
+                error={classificationError}
+                required={false}
+              />
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -722,7 +802,12 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       )}
 
       <div className="mb-3">
-        <ChannelClassification channelId={channelId} onUpdate={setClassifications} />
+        <ChannelClassification
+          key={`${channelId}-${classificationRefreshKey}`}
+          channelId={channelId}
+          readOnly
+          onUpdate={setClassifications}
+        />
       </div>
 
       <div className="mb-3">

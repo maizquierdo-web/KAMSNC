@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { MapPin, Search, Edit3 } from 'lucide-react';
+import { normalizeSpanishGeography } from '../lib/spanishGeography';
 
 /**
  * Autocompletado de localidad española usando Nominatim.
- * Devuelve localidad + provincia.
+ * Devuelve localidad, provincia y comunidad autónoma.
  */
-function LocalityAutocomplete({ value, onChange, onProvinceChange, className }) {
+function LocalityAutocomplete({ value, onChange, onProvinceChange, onAutonomousCommunityChange, className }) {
   const [query, setQuery] = useState(value || '');
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,8 +46,8 @@ function LocalityAutocomplete({ value, onChange, onProvinceChange, className }) 
       const results = data
         .map(item => {
           const city = item.address?.city || item.address?.town || item.address?.village || item.address?.municipality || '';
-          const province = item.address?.province || item.address?.state || '';
-          return { city, province, display: item.display_name };
+          const { province, autonomousCommunity } = normalizeSpanishGeography(item.address);
+          return { city, province, autonomousCommunity, display: item.display_name };
         })
         .filter(r => {
           if (!r.city || seen.has(r.city + r.province)) return false;
@@ -66,6 +67,7 @@ function LocalityAutocomplete({ value, onChange, onProvinceChange, className }) 
     setQuery(s.city);
     onChange(s.city);
     if (onProvinceChange) onProvinceChange(s.province);
+    if (onAutonomousCommunityChange) onAutonomousCommunityChange(s.autonomousCommunity);
     setShow(false);
   }
 
@@ -84,7 +86,9 @@ function LocalityAutocomplete({ value, onChange, onProvinceChange, className }) 
               <MapPin size={13} className="text-brand-500 mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-semibold text-text-primary">{s.city}</div>
-                <div className="text-[10px] text-text-muted">{s.province}</div>
+                <div className="text-[10px] text-text-muted">
+                  {[s.province, s.autonomousCommunity].filter(Boolean).join(' · ')}
+                </div>
               </div>
             </button>
           ))}
@@ -242,6 +246,7 @@ export default function AddressFields({ form, update, fieldClass }) {
             value={form.city}
             onChange={(v) => update('city', v)}
             onProvinceChange={(v) => update('province', v)}
+            onAutonomousCommunityChange={(v) => update('comunidad_autonoma', v)}
             className={fieldClass}
           />
         </div>

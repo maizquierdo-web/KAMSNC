@@ -635,12 +635,12 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           </div>
         ) : (
           <>
-            <div className="flex items-start gap-3 mb-3">
-              <div className={`w-12 h-12 rounded-xl ${status.bg} ${status.text} flex items-center justify-center text-lg font-extrabold flex-shrink-0`}>
+            <div className="mb-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2 sm:flex sm:gap-3">
+              <div className={`row-span-2 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-base font-extrabold sm:h-12 sm:w-12 sm:text-lg ${status.bg} ${status.text}`}>
                 {channel.name.charAt(0)}
               </div>
-              <div className="flex-1">
-                <h2 className="text-lg font-extrabold tracking-tight">{channel.name}</h2>
+              <div className="min-w-0 flex-1">
+                <h2 className="break-words text-base font-extrabold leading-tight tracking-tight sm:text-lg">{channel.name}</h2>
                 <div className="flex flex-wrap items-center gap-2 mt-1">
                   {classifications.length > 0 ? (
                     classifications.map(cls => (
@@ -659,12 +659,12 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   )}
                 </div>
               </div>
-              <button onClick={() => setCopilotOpen(true)}
-                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl border border-navy-100 bg-navy-50 px-3 py-2 text-xs font-bold text-navy-700 transition-colors hover:border-navy-200 hover:bg-navy-100 [&>svg]:text-navy-500">
-                <Sparkles size={14} /> Explícame esta cuenta
+              <button type="button" onClick={() => setCopilotOpen(true)}
+                className="col-span-2 col-start-2 row-start-2 flex w-fit max-w-full flex-shrink-0 items-center gap-1 rounded-lg border border-navy-100 bg-navy-50 px-2 py-1.5 text-[10px] font-bold leading-none text-navy-700 transition-colors hover:border-navy-200 hover:bg-navy-100 sm:ml-auto sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs [&>svg]:text-navy-500">
+                <Sparkles className="h-3 w-3 flex-shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="truncate">Explícame esta cuenta</span>
               </button>
-              <button onClick={startEdit}
-                className="p-2 rounded-lg hover:bg-surface-2 text-text-muted hover:text-text-primary transition-colors flex-shrink-0">
+              <button type="button" onClick={startEdit} aria-label="Editar canal"
+                className="col-start-3 row-start-1 flex-shrink-0 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary sm:p-2">
                 <Edit3 size={16} />
               </button>
             </div>

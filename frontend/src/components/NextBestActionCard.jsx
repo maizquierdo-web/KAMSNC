@@ -71,10 +71,10 @@ export default function NextBestActionCard({ channel, refreshKey = 0 }) {
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-text-primary">Recomendación de la IA</h3>
+              <h3 className="text-sm font-bold text-text-primary">Next Best Action</h3>
               {generatedAt && <span className="flex items-center gap-1 text-[10px] text-text-muted"><Clock3 size={11} /> {generatedTime(generatedAt)}</span>}
             </div>
-            {!result && !loading && !error && <p className="mt-0.5 text-[11px] text-text-secondary">Propone el siguiente movimiento sin cambiar la acción registrada.</p>}
+            {!result && !loading && !error && <p className="mt-0.5 text-[11px] text-text-secondary">Recomendación de la IA: propone el siguiente movimiento sin cambiar la acción registrada.</p>}
             {loading && <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-secondary"><Loader2 size={12} className="animate-spin" /> Analizando el contexto del canal…</p>}
           </div>
         </div>

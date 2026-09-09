@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import BenchmarkCandidateModal from './BenchmarkCandidateModal';
 import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
 import { useAuthContext } from './AuthProvider';
+import { loadChannelAiContext } from '../lib/channelAiContext';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
@@ -16,11 +17,6 @@ const SUGGESTIONS = [
   'Prepárame la próxima reunión',
   'Redacta un correo de seguimiento',
 ];
-
-const TYPE_LABELS = {
-  call: 'Llamada', email: 'Email', whatsapp: 'WhatsApp', meeting: 'Reunión',
-  linkedin: 'LinkedIn', other: 'Acción', visit: 'Visita',
-};
 
 function useDesktopPanelLayout() {
   const [matches, setMatches] = useState(() => window.matchMedia(DESKTOP_PANEL_QUERY).matches);
@@ -34,16 +30,6 @@ function useDesktopPanelLayout() {
   }, []);
 
   return matches;
-}
-
-function dateLabel(value) {
-  if (!value) return '-';
-  return new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function compact(value, limit = 500) {
-  if (!value) return '-';
-  return String(value).replace(/\s+/g, ' ').trim().slice(0, limit);
 }
 
 export default function ChannelCopilotPanel({ open, onClose, channel }) {
@@ -77,89 +63,19 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   async function loadContext() {
     setLoadingContext(true);
     try {
-      const [classRes, interactionsRes, visitsRes, notesRes, meetingsRes, historyRes, businessCaseRes, profileRes, memoryRes] = await Promise.all([
-        supabase.from('channel_classifications').select('custom_text, channel_classification(canal, subcanal, tipo)').eq('channel_id', channel.id),
-        supabase.from('channel_interactions').select('interaction_type, direction, subject, notes, result, contact_person, created_at, planned_date, planned_time, is_completed').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('visits').select('checkin_at, result, objective, notes, next_steps, next_action_date').eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(10),
-        supabase.from('channel_notes').select('content, created_at, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('channel_meetings').select('meeting_date, attendees, notes, file_name, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('channel_pipeline_history').select('from_stage, to_stage, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('business_cases').select('file_name, updated_at').eq('channel_id', channel.id).maybeSingle(),
-        supabase.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
-        supabase.from('channel_copilot_messages').select('id, role, content, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(40),
-      ]);
+      const loaded = await loadChannelAiContext(channel);
+      const savedMessages = loaded.savedMessages;
 
-      const classifications = (classRes.data || []).map(item => {
-        const classification = item.channel_classification;
-        return [classification?.canal, classification?.subcanal, classification?.tipo, item.custom_text].filter(Boolean).join(' > ');
-      });
-      const interactions = interactionsRes.data || [];
-      const visits = visitsRes.data || [];
-      const notes = notesRes.data || [];
-      const meetings = meetingsRes.data || [];
-      const history = historyRes.data || [];
-      const businessCase = businessCaseRes.data;
-      const responsible = profileRes.data;
-      const savedMessages = memoryRes.error ? [] : (memoryRes.data || []).reverse().map(message => ({
-        id: message.id,
-        role: message.role,
-        text: message.content,
-        persisted: true,
-      }));
-
-      if (memoryRes.error) {
-        console.warn('No se pudo cargar la memoria del copiloto:', memoryRes.error);
+      if (loaded.memoryError) {
+        console.warn('No se pudo cargar la memoria del copiloto:', loaded.memoryError);
         setMemoryNotice('La memoria persistente no está disponible.');
       } else if (savedMessages.length) {
         setMemoryNotice(`${savedMessages.length} mensajes recuperados de la memoria del canal.`);
       }
-
-      const completedInteractions = interactions.filter(item => item.is_completed === true || (item.is_completed !== false && !item.planned_date));
-      const plannedInteractions = interactions.filter(item => item.planned_date && item.is_completed !== true);
-
-      const contextText = `FICHA DEL CANAL
-Nombre: ${channel.name}
-Estado: ${channel.status || '-'}
-Fase: ${channel.pipeline_stage || '-'}
-Responsable: ${responsible?.full_name || 'Sin asignar'}${responsible?.zone ? ` · Zona ${responsible.zone}` : ''}
-Clasificación: ${classifications.join(' | ') || 'Sin clasificación'}
-Contacto: ${channel.contact_name || '-'}
-Email: ${channel.email || '-'}
-Teléfono: ${channel.phone || '-'}
-Ciudad/Provincia: ${[channel.city, channel.province].filter(Boolean).join(', ') || '-'}
-Potencial CAEs: ${channel.potencial_caes || '-'}
-Potencial Energía: ${channel.potencial_energia || '-'}
-Notas generales: ${compact(channel.notes, 1200)}
-
-ACCIONES PLANIFICADAS
-${plannedInteractions.length ? plannedInteractions.map(item => `- ${item.planned_date} ${item.planned_time?.slice(0, 5) || ''} · ${TYPE_LABELS[item.interaction_type] || item.interaction_type}: ${compact(item.subject || item.notes)}`).join('\n') : '- Ninguna'}
-
-INTERACCIONES RECIENTES
-${completedInteractions.length ? completedInteractions.map(item => `- ${dateLabel(item.created_at)} · ${TYPE_LABELS[item.interaction_type] || item.interaction_type}${item.result ? ` · Resultado: ${item.result}` : ''}${item.contact_person ? ` · Contacto: ${item.contact_person}` : ''} · ${compact(item.subject || item.notes)}`).join('\n') : '- Ninguna'}
-
-VISITAS
-${visits.length ? visits.map(item => `- ${dateLabel(item.checkin_at)} · Resultado: ${item.result || '-'} · Objetivo: ${compact(item.objective)} · Notas: ${compact(item.notes)} · Próximo paso: ${compact(item.next_steps)} ${item.next_action_date || ''}`).join('\n') : '- Ninguna'}
-
-REUNIONES Y ACTAS
-${meetings.length ? meetings.map(item => `- ${dateLabel(item.meeting_date || item.created_at)} · Asistentes: ${compact(item.attendees)} · Notas: ${compact(item.notes, 800)}${item.file_name ? ` · Documento: ${item.file_name}` : ''}`).join('\n') : '- Ninguna'}
-
-NOTAS INTERNAS
-${notes.length ? notes.map(item => `- ${dateLabel(item.created_at)} · ${item.profiles?.full_name || 'Usuario'}: ${compact(item.content, 800)}`).join('\n') : '- Ninguna'}
-
-HISTÓRICO DE FASES
-${history.length ? history.map(item => `- ${dateLabel(item.created_at)} · ${item.from_stage || 'Inicio'} → ${item.to_stage}`).join('\n') : '- Sin cambios registrados'}
-
-BUSINESS CASE
-${businessCase ? `Adjunto: ${businessCase.file_name} · Actualizado: ${dateLabel(businessCase.updated_at)}` : 'No adjuntado'}`;
-
-      setContext(contextText);
-      setContextStats({
-        activities: completedInteractions.length + visits.length + notes.length,
-        meetings: meetings.length,
-        documents: (businessCase ? 1 : 0) + meetings.filter(item => item.file_name).length,
-      });
+      setContext(loaded.context);
+      setContextStats(loaded.stats);
       setMessages(savedMessages);
-      await askCopilot('Resume el estado actual del canal en un máximo de cuatro frases e indica el siguiente paso más importante.', contextText, true, savedMessages);
+      await askCopilot('Resume el estado actual del canal en un máximo de cuatro frases e indica el siguiente paso más importante.', loaded.context, true, savedMessages);
     } catch (contextError) {
       console.error('Error cargando contexto del canal:', contextError);
       setError('No se pudo cargar todo el contexto del canal.');

@@ -12,6 +12,7 @@ import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
 import ChannelCaesActiveDetails from '../components/ChannelCaesActiveDetails';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
+import NextBestActionCard from '../components/NextBestActionCard';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
 import { BulkReassignModal } from '../components/ChannelReassign';
@@ -781,6 +782,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           setChannel(prev => ({ ...prev, assigned_to: kamId }));
         }} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
+
+      <NextBestActionCard channel={channel} refreshKey={activityRefreshKey} />
 
       <div id="channel-activity" className="mb-3 scroll-mt-20">
         <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />

@@ -10,8 +10,9 @@ import { Check, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
  * - value: array de { classification_id, canal, custom_text? }
  * - onChange: (selections) => void
  * - error: string (mensaje de error de validación)
+ * - required: muestra el campo como obligatorio (true por defecto)
  */
-export default function ClassificationSelector({ value = [], onChange, error }) {
+export default function ClassificationSelector({ value = [], onChange, error, required = true }) {
   const [allClassifications, setAllClassifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(true);
@@ -93,7 +94,7 @@ export default function ClassificationSelector({ value = [], onChange, error }) 
     <div>
       <div className="flex items-center justify-between mb-1">
         <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider">
-          Clasificación *
+          Clasificación{required ? ' *' : ''}
         </label>
         <button type="button" onClick={() => setExpanded(!expanded)} className="text-text-muted hover:text-text-secondary">
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}

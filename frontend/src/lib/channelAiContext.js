@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { extractMeetingDocumentTextFromUrl } from './meetingDocumentText';
 
 const TYPE_LABELS = {
   call: 'Llamada', email: 'Email', whatsapp: 'WhatsApp', meeting: 'Reunión',
@@ -57,7 +58,7 @@ export async function loadChannelAiContext(channel, client = supabase) {
     client.from('visits').select('checkin_at, result, objective, result_notes, next_steps, next_action_date').eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(10),
     client.from('planned_visits').select('planned_date, planned_time, notes, is_completed, created_at').eq('channel_id', channel.id).eq('is_completed', false).order('planned_date', { ascending: true }).limit(10),
     client.from('channel_notes').select('content, created_at, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
-    client.from('channel_meetings').select('meeting_date, attendees, notes, file_name, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
+    client.from('channel_meetings').select('meeting_date, attendees, notes, file_url, file_name, file_size, created_at').eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(15),
     client.from('channel_pipeline_history').select('from_stage, to_stage, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
     client.from('business_cases').select('file_name, updated_at').eq('channel_id', channel.id).maybeSingle(),
     client.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
@@ -74,7 +75,20 @@ export async function loadChannelAiContext(channel, client = supabase) {
   const visits = resultData(visitsRes);
   const plannedVisits = resultData(plannedVisitsRes);
   const notes = resultData(notesRes);
-  const meetings = resultData(meetingsRes);
+  const meetings = await Promise.all(resultData(meetingsRes).map(async meeting => {
+    if (!meeting.file_url || !meeting.file_name) return meeting;
+    try {
+      const extracted = await extractMeetingDocumentTextFromUrl({
+        url: meeting.file_url,
+        fileName: meeting.file_name,
+        fileSize: meeting.file_size,
+      });
+      return { ...meeting, documentText: extracted.text || '' };
+    } catch (error) {
+      console.warn(`No se pudo leer el acta ${meeting.file_name}:`, error);
+      return meeting;
+    }
+  }));
   const history = resultData(historyRes);
   const businessCase = businessCaseRes?.error ? null : businessCaseRes?.data;
   const responsible = profileRes?.error ? null : profileRes?.data;
@@ -142,7 +156,7 @@ VISITAS REALIZADAS
 ${visits.length ? visits.map(item => `- ${dateLabel(item.checkin_at)} · Resultado: ${valueOrDash(item.result)} · Objetivo: ${compact(item.objective)} · Notas: ${compact(item.result_notes)} · Próximo paso: ${compact(item.next_steps)} ${item.next_action_date || ''}`).join('\n') : '- Ninguna'}
 
 REUNIONES Y ACTAS
-${meetings.length ? meetings.map(item => `- ${dateLabel(item.meeting_date || item.created_at)} · Asistentes: ${compact(item.attendees)} · Notas: ${compact(item.notes, 800)}${item.file_name ? ` · Documento: ${item.file_name}` : ''}`).join('\n') : '- Ninguna'}
+${meetings.length ? meetings.map(item => `- ${dateLabel(item.meeting_date || item.created_at)} · Asistentes: ${compact(item.attendees)} · Notas: ${compact(item.notes, 1000)}${item.file_name ? ` · Documento: ${item.file_name}` : ''}${item.documentText ? ` · Contenido del acta: ${compact(item.documentText, 3500)}` : ''}`).join('\n') : '- Ninguna'}
 
 NOTAS INTERNAS
 ${notes.length ? notes.map(item => `- ${dateLabel(item.created_at)} · ${item.profiles?.full_name || 'Usuario'}: ${compact(item.content, 800)}`).join('\n') : '- Ninguna'}

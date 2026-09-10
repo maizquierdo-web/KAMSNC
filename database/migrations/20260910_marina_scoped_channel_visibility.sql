@@ -84,7 +84,7 @@ DECLARE
   marina_ids uuid[];
   owner_ids uuid[];
   marina_id uuid;
-  owner_id uuid;
+  scoped_owner_id uuid;
   target_status text;
 BEGIN
   SELECT array_agg(id ORDER BY id)
@@ -112,12 +112,12 @@ BEGIN
   END IF;
 
   marina_id := marina_ids[1];
-  FOREACH owner_id IN ARRAY owner_ids LOOP
+  FOREACH scoped_owner_id IN ARRAY owner_ids LOOP
     FOREACH target_status IN ARRAY ARRAY['en_proceso_alta', 'activo'] LOOP
       INSERT INTO public.channel_access_scopes (
         viewer_id, owner_id, channel_status, can_edit
       ) VALUES (
-        marina_id, owner_id, target_status, true
+        marina_id, scoped_owner_id, target_status, true
       )
       ON CONFLICT (viewer_id, owner_id, channel_status)
       DO UPDATE SET can_edit = true;

@@ -64,24 +64,24 @@ export default function NextBestActionCard({ channel, refreshKey = 0 }) {
 
   return (
     <section className="mb-3 overflow-hidden rounded-xl border border-navy-100 bg-navy-50/30">
-      <div className="flex flex-col gap-3 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-navy-100 text-navy-600">
+      <div className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-3.5 sm:py-3">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-navy-100 text-navy-600 sm:h-9 sm:w-9 sm:rounded-xl">
             <Lightbulb size={17} />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-bold text-text-primary">Next Best Action</h3>
+              <h3 className="text-[13px] font-bold text-text-primary sm:text-sm">Next Best Action</h3>
               {generatedAt && <span className="flex items-center gap-1 text-[10px] text-text-muted"><Clock3 size={11} /> {generatedTime(generatedAt)}</span>}
             </div>
-            {!result && !loading && !error && <p className="mt-0.5 text-[11px] text-text-secondary">Recomendación de la IA: propone el siguiente movimiento sin cambiar la acción registrada.</p>}
+            {!result && !loading && !error && <p className="mt-0.5 text-[11px] leading-snug text-text-secondary">Recomendación de la IA: propone el siguiente movimiento sin cambiar la acción registrada.</p>}
             {loading && <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-secondary"><Loader2 size={12} className="animate-spin" /> Analizando el contexto del canal…</p>}
           </div>
         </div>
 
         {!result && !loading && (
           <button type="button" onClick={generateRecommendation}
-            className="flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-700 transition-colors hover:bg-navy-50">
+            className="flex flex-shrink-0 self-end items-center justify-center gap-1.5 rounded-lg border border-navy-200 bg-white px-2.5 py-1.5 text-[11px] font-bold text-navy-700 transition-colors hover:bg-navy-50 sm:self-auto sm:px-3 sm:py-2 sm:text-xs">
             <Sparkles size={13} /> Obtener recomendación
           </button>
         )}

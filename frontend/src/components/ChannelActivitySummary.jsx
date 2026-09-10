@@ -253,13 +253,13 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
 
   return (
     <div className="-mx-3.5 -mb-3.5 mt-3 grid grid-cols-2 overflow-visible border-t border-surface-3 bg-white lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none">
-      <div className={`flex min-w-0 items-center gap-2.5 border-b border-r border-surface-3 p-3 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
-        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
+      <div className={`flex min-w-0 items-center gap-2 border-b border-r border-surface-3 p-2.5 sm:gap-2.5 sm:p-3 lg:border-b-0 ${noActivity ? 'bg-amber-50/50' : 'bg-navy-50/40'}`}>
+        <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${noActivity ? 'bg-amber-100 text-amber-600' : 'bg-navy-100 text-navy-600'}`}>
           <Clock3 size={18} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Última actividad</div>
-          <div className={`truncate text-sm font-bold ${noActivity ? 'text-amber-700' : 'text-slate-700'}`}>
+          <div className={`line-clamp-2 text-xs font-bold leading-snug sm:truncate sm:text-sm ${noActivity ? 'text-amber-700' : 'text-slate-700'}`}>
             {summary.latestActivity
               ? `${formatRelativeDate(summary.latestActivity.date)} · ${summary.latestActivity.label}` : 'Sin actividad'}
           </div>
@@ -268,13 +268,13 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
 
       <div onClick={openActionEditor} role="button" tabIndex={0}
         onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openActionEditor(); }}
-        className="relative flex min-w-0 cursor-pointer items-center gap-2.5 border-b border-surface-3 bg-orange-50/40 p-3 transition-colors hover:bg-orange-50 lg:border-b-0 lg:border-r">
-        <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
+        className="relative flex min-w-0 cursor-pointer items-center gap-2 border-b border-surface-3 bg-orange-50/40 p-2.5 transition-colors hover:bg-orange-50 sm:gap-2.5 sm:p-3 lg:border-b-0 lg:border-r">
+        <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9 ${nextActionAlert ? 'bg-red-100 text-red-500' : 'bg-orange-100 text-orange-500'}`}>
           <CalendarDays size={18} />
         </div>
         <div className="min-w-0">
           <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-text-muted">Siguiente acción</div>
-          <div className={`truncate text-sm font-bold ${nextActionAlert ? 'text-red-500' : 'text-orange-500'}`}>
+          <div className={`line-clamp-2 text-xs font-bold leading-snug sm:truncate sm:text-sm ${nextActionAlert ? 'text-red-500' : 'text-orange-500'}`}>
             {summary.nextAction
               ? `${formatActionDate(summary.nextAction.date)} · ${summary.nextAction.label}` : 'Sin siguiente acción'}
           </div>
@@ -329,8 +329,8 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
         )}
       </div>
 
-      <div className="flex min-w-0 items-center gap-2.5 border-r border-surface-3 bg-surface-1 p-3">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-surface-2 text-navy-500">
+      <div className="order-3 flex min-w-0 items-center gap-2 border-r border-surface-3 bg-surface-1 p-2.5 sm:gap-2.5 sm:p-3 lg:order-none">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-surface-2 text-navy-500 sm:h-9 sm:w-9">
           <TrendingUp size={18} />
         </div>
         <div className="min-w-0">
@@ -346,8 +346,8 @@ export default function ChannelActivitySummary({ channel, isCaes = false, refres
 
       <ChannelBusinessCasePrompt channelId={channel.id} isCaes={isCaes} variant="summary" />
 
-      <div className="relative flex min-w-0 items-center gap-2.5 bg-surface-1 p-3">
-        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-sm font-bold text-white">
+      <div className="relative order-4 flex min-w-0 items-center gap-2 border-surface-3 bg-surface-1 p-2.5 sm:gap-2.5 sm:p-3 lg:order-none">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-navy-500 text-xs font-bold text-white sm:h-9 sm:w-9 sm:text-sm">
           {summary.responsible?.charAt(0) || '?'}
         </div>
         <div className="min-w-0 flex-1">

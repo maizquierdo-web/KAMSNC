@@ -194,7 +194,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
 }
 
 // ============ SMART COMPLETION MODAL ============
-function CompleteActionModal({ event, onSave, onClose }) {
+function CompleteActionModal({ event, onSave, onClose, allowNextAction = true }) {
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
   const [addNextAction, setAddNextAction] = useState(false);
@@ -259,7 +259,7 @@ function CompleteActionModal({ event, onSave, onClose }) {
               className={`${fieldClass} resize-none`} />
           </div>
 
-          <div className="border border-surface-3 rounded-xl overflow-hidden">
+          {allowNextAction && <div className="border border-surface-3 rounded-xl overflow-hidden">
             <label className="flex items-center gap-3 px-3 py-3 cursor-pointer bg-surface-0">
               <input type="checkbox" checked={addNextAction} onChange={(e) => setAddNextAction(e.target.checked)}
                 className="w-4 h-4 accent-brand-500" />
@@ -297,7 +297,7 @@ function CompleteActionModal({ event, onSave, onClose }) {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         <div className="p-4 border-t border-surface-3">
@@ -377,7 +377,7 @@ function RescheduleActionModal({ event, onSave, onClose }) {
 }
 
 // ============ EVENT CARD ============
-function EventCard({ event, onDelete, onComplete, onReschedule, canModify }) {
+function EventCard({ event, onDelete, onComplete, onReschedule, canModify, canComplete = canModify }) {
   const time = event.planned_time ? event.planned_time.slice(0, 5) : '--:--';
   const cfg = TYPE_CONFIG[event._type] || TYPE_CONFIG.other;
   const Icon = cfg.icon;
@@ -420,6 +420,11 @@ function EventCard({ event, onDelete, onComplete, onReschedule, canModify }) {
             <button onClick={(e) => { e.stopPropagation(); onDelete?.(event); }}
               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-red-400 transition-colors"><X size={14} /></button>
           </>
+        ) : canComplete && event._type !== 'visit' ? (
+          <button onClick={(e) => { e.stopPropagation(); onComplete?.(event); }}
+            className="px-2.5 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-[10px] font-bold transition-colors">
+            Completar
+          </button>
         ) : (
           <span className="text-[9px] font-semibold px-2 py-1 rounded-lg bg-surface-2 text-text-muted">
             Solo lectura
@@ -577,11 +582,27 @@ export default function CalendarPage() {
   const [summaryRows, setSummaryRows] = useState([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryKamIds, setSummaryKamIds] = useState([]);
+  const [delegatedCompletionOwnerIds, setDelegatedCompletionOwnerIds] = useState(new Set());
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
 
   useEffect(() => { if (user) { loadWeekData(); loadChannels(); if (isManager) loadTeamKams(); } }, [user, currentWeekStart, selectedKam]);
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    supabase.from('action_completion_delegates').select('owner_id').eq('delegate_id', user.id)
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          console.error('No se pudo cargar la delegación de acciones:', error);
+          setDelegatedCompletionOwnerIds(new Set());
+          return;
+        }
+        setDelegatedCompletionOwnerIds(new Set((data || []).map(item => item.owner_id)));
+      });
+    return () => { active = false; };
+  }, [user?.id]);
   useEffect(() => {
     if (user) loadActivitySummary();
   }, [user, summaryKamIds.join(','), summaryPeriod, summaryFrom, summaryTo, currentWeekStart, teamKams.length]);
@@ -807,19 +828,41 @@ export default function CalendarPage() {
   }
 
   async function handleCompleteEvent(event) {
-    if (event?._userId !== user.id) {
+    if (!canCompleteEvent(event)) {
       setToast({ message: 'Solo el KAM responsable puede completar esta actividad.', type: 'error' });
       return;
     }
     setEventToComplete(event);
   }
 
+  function canCompleteEvent(event) {
+    return event?._userId === user.id || delegatedCompletionOwnerIds.has(event?._userId);
+  }
+
   async function handleSaveCompletion({ result, notes, nextAction }) {
     const event = eventToComplete;
     if (!event) return;
     try {
-      if (event._userId !== user.id) throw new Error('Solo el KAM responsable puede modificar esta actividad.');
+      const isOwnerCompletion = event._userId === user.id;
+      if (!isOwnerCompletion && !delegatedCompletionOwnerIds.has(event._userId)) {
+        throw new Error('No tienes permiso para completar esta actividad.');
+      }
       const completedNotes = [event.notes, notes].filter(Boolean).join('\n\nResultado: ');
+      if (!isOwnerCompletion) {
+        if (nextAction) throw new Error('La delegación permite completar la acción, pero no planificar otra en nombre del KAM.');
+        const { data, error } = await supabase.rpc('complete_delegated_action', {
+          target_source: event._source,
+          target_action_id: event._sourceId,
+          completion_result: result || null,
+          completion_notes: completedNotes || null,
+        });
+        if (error) throw error;
+        if (data !== event._sourceId) throw new Error('La actividad no se pudo completar.');
+        setEventToComplete(null);
+        await loadWeekData();
+        setToast({ message: '✓ Acción completada por suplencia', type: 'success' });
+        return;
+      }
       let completionQuery;
       if (event._source === 'planned_visit') {
         completionQuery = supabase.from('planned_visits').update({
@@ -1063,7 +1106,8 @@ const visibleChannels = channels.filter(ch => {
                   {new Date(`${event.planned_date}T00:00:00`).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </div>
                 <EventCard event={event} onDelete={handleDeleteEvent} onComplete={handleCompleteEvent}
-                  onReschedule={setEventToReschedule} canModify={event._userId === user.id} />
+                  onReschedule={setEventToReschedule} canModify={event._userId === user.id}
+                  canComplete={canCompleteEvent(event)} />
               </div>
             ))}
           </div>
@@ -1122,7 +1166,7 @@ const visibleChannels = channels.filter(ch => {
               {dayEvents.map(event => (
                 <EventCard key={`${event._source}-${event._sourceId}`} event={event}
                   onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule}
-                  canModify={event._userId === user.id} />
+                  canModify={event._userId === user.id} canComplete={canCompleteEvent(event)} />
               ))}
               <button onClick={() => setShowNewModal(true)}
                 className="w-full py-2.5 border border-dashed border-surface-3 hover:border-brand-300 hover:bg-brand-50/50 rounded-xl text-xs font-semibold text-text-muted hover:text-brand-500 transition-colors">
@@ -1166,7 +1210,7 @@ const visibleChannels = channels.filter(ch => {
                         {events.map(event => (
                           <EventCard key={`${event._source}-${event._sourceId}`} event={event}
                             onDelete={handleDeleteEvent} onComplete={handleCompleteEvent} onReschedule={setEventToReschedule}
-                            canModify={event._userId === user.id} />
+                            canModify={event._userId === user.id} canComplete={canCompleteEvent(event)} />
                         ))}
                       </div>
                     )}
@@ -1272,7 +1316,8 @@ const visibleChannels = channels.filter(ch => {
       )}
 
       {eventToComplete && (
-        <CompleteActionModal event={eventToComplete} onSave={handleSaveCompletion} onClose={() => setEventToComplete(null)} />
+        <CompleteActionModal event={eventToComplete} onSave={handleSaveCompletion} onClose={() => setEventToComplete(null)}
+          allowNextAction={eventToComplete._userId === user.id} />
       )}
 
       {eventToReschedule && (

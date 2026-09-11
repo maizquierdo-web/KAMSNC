@@ -393,6 +393,10 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       setEditError('El nombre es obligatorio');
       return;
     }
+    if (editClassifications.length === 0) {
+      setClassificationError('Selecciona al menos una clasificación');
+      return;
+    }
     setSaving(true);
     setEditError('');
     setClassificationError('');
@@ -522,7 +526,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   setClassificationError('');
                 }}
                 error={classificationError}
-                required={false}
+                required
               />
 
               <div className="grid grid-cols-2 gap-3">
@@ -911,6 +915,11 @@ function NewChannelForm({ onBack, onSaved, types }) {
   function prevStep() { setError(''); setStep(s => s - 1); }
 
   async function handleSave() {
+    if (classifications.length === 0) {
+      setClassificationError('Selecciona al menos una clasificación');
+      setStep(2);
+      return;
+    }
     setSaving(true); setError('');
     try {
       const { data, error: insertError } = await supabase.from('channels').insert({

@@ -17,7 +17,7 @@ const CAES_LABELS = {
   },
   caes_remuneration_tier: { tier_a: 'Tramo A', tier_b: 'Tramo B', tier_c: 'Tramo C' },
   caes_technical_office: { sinceo2: 'SINCEO2', e_program: 'E-PROGRAM', unassigned: 'Sin OT asignada' },
-  caes_verifier: { margube: 'MARGUBE', eqa: 'EQA', unassigned: 'Sin verificador asignado' },
+  caes_verifier: { margube: 'MARGUBE', eqa: 'EQA', oca: 'OCA', unassigned: 'Sin verificador asignado' },
 };
 
 function valueOrDash(value) {

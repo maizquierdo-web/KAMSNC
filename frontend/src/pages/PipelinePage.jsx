@@ -891,7 +891,7 @@ const ROLE_OPTIONS = [['pending', 'Pendiente de definir'], ['promoter', 'Promoto
 const CONTRACT_OPTIONS = [['pending', 'Pendiente de definir'], ['model_2_alternative_payer', 'Modelo 2 · Pagador alternativo'], ['model_3_savings_facilitator', 'Modelo 3 · Facilitador de ahorro']];
 const TIER_OPTIONS = [['pending', 'Pendiente de definir'], ['tier_a', 'Tramo A'], ['tier_b', 'Tramo B'], ['tier_c', 'Tramo C']];
 const OFFICE_OPTIONS = [['sinceo2', 'SINCEO2'], ['e_program', 'E-PROGRAM'], ['unassigned', 'Sin OT asignada']];
-const VERIFIER_OPTIONS = [['margube', 'MARGUBE'], ['eqa', 'EQA'], ['unassigned', 'Sin verificador asignado']];
+const VERIFIER_OPTIONS = [['margube', 'MARGUBE'], ['eqa', 'EQA'], ['oca', 'OCA'], ['unassigned', 'Sin verificador asignado']];
 
 function TransitionField({ label, value, options, onChange, required = true }) {
   return <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}{required ? ' *' : ''}</span>

@@ -51,7 +51,7 @@ const CAES_ROLE_LABELS = { promoter: 'Promotor', promoter_ot: 'Promotor + OT', p
 const CONTRACT_LABELS = { model_2_alternative_payer: 'Modelo 2 · Pagador alternativo', model_3_savings_facilitator: 'Modelo 3 · Facilitador de ahorro' };
 const TIER_LABELS = { tier_a: 'Tramo A', tier_b: 'Tramo B', tier_c: 'Tramo C' };
 const OFFICE_LABELS = { sinceo2: 'SINCEO2', e_program: 'E-PROGRAM', unassigned: 'Sin OT asignada' };
-const VERIFIER_LABELS = { margube: 'MARGUBE', eqa: 'EQA', unassigned: 'Sin verificador asignado' };
+const VERIFIER_LABELS = { margube: 'MARGUBE', eqa: 'EQA', oca: 'OCA', unassigned: 'Sin verificador asignado' };
 
 function dateLabel(value) {
   return value ? new Date(value).toLocaleDateString('es-ES') : '';

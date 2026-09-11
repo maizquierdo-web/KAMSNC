@@ -11,6 +11,7 @@ const TECHNICAL_OFFICES = [
 const VERIFIERS = [
   { value: 'margube', label: 'MARGUBE' },
   { value: 'eqa', label: 'EQA' },
+  { value: 'oca', label: 'OCA' },
   { value: 'unassigned', label: 'Sin verificador asignado' },
 ];
 

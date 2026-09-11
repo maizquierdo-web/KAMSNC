@@ -194,7 +194,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
 }
 
 // ============ SMART COMPLETION MODAL ============
-function CompleteActionModal({ event, onSave, onClose, allowNextAction = true }) {
+function CompleteActionModal({ event, onSave, onClose, allowNextAction = true, administrativeVisit = false }) {
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
   const [addNextAction, setAddNextAction] = useState(false);
@@ -206,7 +206,7 @@ function CompleteActionModal({ event, onSave, onClose, allowNextAction = true })
   const fieldClass = 'w-full px-3 py-2.5 bg-surface-0 border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 transition-colors';
 
   async function handleSave() {
-    if (!result || (addNextAction && !nextDate)) return;
+    if (!result || (administrativeVisit && !notes.trim()) || (addNextAction && !nextDate)) return;
     setSaving(true);
     try {
       await onSave({
@@ -229,7 +229,7 @@ function CompleteActionModal({ event, onSave, onClose, allowNextAction = true })
       <div className="bg-surface-1 border border-surface-3 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between p-4 border-b border-surface-3">
           <div>
-            <h3 className="font-bold text-sm">Completar acción</h3>
+            <h3 className="font-bold text-sm">{administrativeVisit ? 'Finalizar visita pendiente' : 'Completar acción'}</h3>
             <p className="text-xs text-text-secondary">{event?._channelName} · {TYPE_CONFIG[event?._type]?.label || 'Acción'}</p>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary"><X size={20} /></button>
@@ -253,10 +253,15 @@ function CompleteActionModal({ event, onSave, onClose, allowNextAction = true })
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Nota <span className="normal-case font-normal">(opcional)</span></label>
+            <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">
+              {administrativeVisit ? 'Motivo del cierre *' : <>Nota <span className="normal-case font-normal">(opcional)</span></>}
+            </label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-              placeholder="Añade solo la información que aporte contexto"
+              placeholder={administrativeVisit ? 'Indica por qué se realiza el cierre administrativo' : 'Añade solo la información que aporte contexto'}
               className={`${fieldClass} resize-none`} />
+            {administrativeVisit && (
+              <p className="mt-1 text-[9px] text-text-muted">Se conservará el check-in geolocalizado y no se generará una ubicación de salida.</p>
+            )}
           </div>
 
           {allowNextAction && <div className="border border-surface-3 rounded-xl overflow-hidden">
@@ -301,10 +306,10 @@ function CompleteActionModal({ event, onSave, onClose, allowNextAction = true })
         </div>
 
         <div className="p-4 border-t border-surface-3">
-          <button onClick={handleSave} disabled={!result || saving || (addNextAction && !nextDate)}
+          <button onClick={handleSave} disabled={!result || saving || (administrativeVisit && !notes.trim()) || (addNextAction && !nextDate)}
             className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-            Guardar y completar
+            {administrativeVisit ? 'Guardar cierre administrativo' : 'Guardar y completar'}
           </button>
         </div>
       </div>
@@ -420,10 +425,10 @@ function EventCard({ event, onDelete, onComplete, onReschedule, canModify, canCo
             <button onClick={(e) => { e.stopPropagation(); onDelete?.(event); }}
               className="p-1.5 rounded-lg hover:bg-surface-2 text-text-muted hover:text-red-400 transition-colors"><X size={14} /></button>
           </>
-        ) : canComplete && event._type !== 'visit' ? (
+        ) : canComplete ? (
           <button onClick={(e) => { e.stopPropagation(); onComplete?.(event); }}
             className="px-2.5 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-[10px] font-bold transition-colors">
-            Completar
+            {event._type === 'visit' ? 'Finalizar visita' : 'Completar'}
           </button>
         ) : (
           <span className="text-[9px] font-semibold px-2 py-1 rounded-lg bg-surface-2 text-text-muted">
@@ -854,7 +859,7 @@ export default function CalendarPage() {
           target_source: event._source,
           target_action_id: event._sourceId,
           completion_result: result || null,
-          completion_notes: completedNotes || null,
+          completion_notes: notes.trim() || null,
         });
         if (error) throw error;
         if (data !== event._sourceId) throw new Error('La actividad no se pudo completar.');
@@ -1317,7 +1322,8 @@ const visibleChannels = channels.filter(ch => {
 
       {eventToComplete && (
         <CompleteActionModal event={eventToComplete} onSave={handleSaveCompletion} onClose={() => setEventToComplete(null)}
-          allowNextAction={eventToComplete._userId === user.id} />
+          allowNextAction={eventToComplete._userId === user.id}
+          administrativeVisit={eventToComplete._userId !== user.id && eventToComplete._type === 'visit'} />
       )}
 
       {eventToReschedule && (

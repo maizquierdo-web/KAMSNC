@@ -26,6 +26,7 @@ const BELL_ALERT_ACTIONS = {
   benchmark_signal: 'Abrir Benchmark',
   team_risk: 'Ver equipo',
   high_potential_movement: 'Abrir canal',
+  delegated_action_completed: 'Abrir canal',
 };
 
 function NotificationsBell({ userId, onReassignClick, onBenchmarkClick }) {

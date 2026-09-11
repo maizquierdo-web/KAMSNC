@@ -86,6 +86,7 @@ async function getChannelLastActivity(channelId) {
 function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, dateType, classifications }) {
   const daysInStage = daysSince(channel.pipeline_stage_changed_at || channel.updated_at);
   const lastVisitDays = channel.last_visit_at ? daysSince(channel.last_visit_at) : null;
+  const isActive = channel.status === 'activo' || stage.key === 'active';
   const isDragging = useRef(false);
   const classLabel = (classifications || []).map(c => c.canal_corto).join(', ');
 
@@ -95,7 +96,7 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
       onDragEnd={() => { isDragging.current = false; }}
       onClick={() => { if (!isDragging.current) onClick(channel.id); }}
       className="bg-[#ffffff] border rounded-xl p-2.5 cursor-pointer active:cursor-grabbing hover:shadow-md hover:border-opacity-80 transition-all group"
-      style={{ borderColor: stage.border }}>
+      style={{ borderColor: isActive ? '#d7dde7' : stage.border }}>
       <div className="flex items-start justify-between gap-1.5 mb-1">
         <div className="flex-1 min-w-0">
           <div className="text-xs font-semibold truncate group-hover:text-[#E87A1E] transition-colors">{channel.name}</div>
@@ -142,10 +143,11 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
         <div className="flex items-center gap-1.5">
           {daysInStage !== null && (
             <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${
+              isActive ? 'bg-[#eef1f5] text-[#5a6078]' :
               daysInStage > 14 ? 'bg-red-500/20 text-red-400' :
               daysInStage > 7  ? 'bg-amber-500/20 text-amber-400' :
               'bg-[#dde1e8] text-[#5a6078]'
-            }`}>{daysInStage}d en fase</span>
+            }`}>{isActive ? `Activo · ${daysInStage} ${daysInStage === 1 ? 'día' : 'días'}` : `${daysInStage}d en fase`}</span>
           )}
         </div>
         {lastVisitDays !== null && (

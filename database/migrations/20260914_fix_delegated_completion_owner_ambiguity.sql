@@ -1,66 +1,3 @@
-ALTER TABLE public.alerts
-  DROP CONSTRAINT IF EXISTS alerts_alert_type_check;
-
-ALTER TABLE public.alerts
-  ADD CONSTRAINT alerts_alert_type_check
-  CHECK (
-    alert_type IN (
-      'task',
-      'followup_overdue',
-      'pipeline_stalled',
-      'channel_inactive',
-      'plan_review',
-      'system',
-      'channel_reassigned',
-      'channel_critical_change',
-      'onboarding_blocked',
-      'benchmark_signal',
-      'team_risk',
-      'high_potential_movement',
-      'delegated_action_completed'
-    )
-  );
-
-DO $$
-DECLARE
-  claudia_ids uuid[];
-  owner_ids uuid[];
-  claudia_id uuid;
-  delegated_owner_id uuid;
-BEGIN
-  SELECT array_agg(id ORDER BY id)
-  INTO claudia_ids
-  FROM public.profiles
-  WHERE is_active = true
-    AND lower(btrim(full_name)) ~ '^claudia([[:space:]]|$)';
-
-  IF coalesce(cardinality(claudia_ids), 0) <> 1 THEN
-    RAISE EXCEPTION 'No se encontró un único perfil activo de Claudia. Coincidencias: %', coalesce(cardinality(claudia_ids), 0);
-  END IF;
-
-  SELECT array_agg(id ORDER BY id)
-  INTO owner_ids
-  FROM public.profiles
-  WHERE is_active = true
-    AND (
-      lower(btrim(full_name)) ~ '^lucía([[:space:]]|$)'
-      OR lower(btrim(full_name)) ~ '^lucia([[:space:]]|$)'
-      OR lower(btrim(full_name)) ~ '^andrea([[:space:]]|$)'
-    );
-
-  IF coalesce(cardinality(owner_ids), 0) <> 2 THEN
-    RAISE EXCEPTION 'No se encontraron exactamente los perfiles activos de Lucía y Andrea. Coincidencias: %', coalesce(cardinality(owner_ids), 0);
-  END IF;
-
-  claudia_id := claudia_ids[1];
-  FOREACH delegated_owner_id IN ARRAY owner_ids LOOP
-    INSERT INTO public.action_completion_delegates (delegate_id, owner_id)
-    VALUES (claudia_id, delegated_owner_id)
-    ON CONFLICT (delegate_id, owner_id) DO NOTHING;
-  END LOOP;
-END;
-$$;
-
 CREATE OR REPLACE FUNCTION public.notify_delegated_action_completion()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -206,24 +143,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
-DROP TRIGGER IF EXISTS notify_delegated_interaction_completion ON public.channel_interactions;
-CREATE TRIGGER notify_delegated_interaction_completion
-  AFTER UPDATE OF is_completed ON public.channel_interactions
-  FOR EACH ROW
-  EXECUTE FUNCTION public.notify_delegated_action_completion();
-
-DROP TRIGGER IF EXISTS notify_delegated_planned_visit_completion ON public.planned_visits;
-CREATE TRIGGER notify_delegated_planned_visit_completion
-  AFTER UPDATE OF is_completed ON public.planned_visits
-  FOR EACH ROW
-  EXECUTE FUNCTION public.notify_delegated_action_completion();
-
-DROP TRIGGER IF EXISTS notify_delegated_visit_completion ON public.visits;
-CREATE TRIGGER notify_delegated_visit_completion
-  AFTER UPDATE OF administrative_closed_at, next_action_date ON public.visits
-  FOR EACH ROW
-  EXECUTE FUNCTION public.notify_delegated_action_completion();
 
 REVOKE ALL ON FUNCTION public.notify_delegated_action_completion() FROM PUBLIC;
 

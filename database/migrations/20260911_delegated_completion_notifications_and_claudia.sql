@@ -69,7 +69,7 @@ SET search_path = public
 AS $$
 DECLARE
   actor_id uuid := auth.uid();
-  owner_id uuid;
+  target_owner_id uuid;
   target_channel_id uuid;
   target_visit_id uuid;
   actor_name text;
@@ -90,7 +90,7 @@ BEGIN
        OR coalesce(NEW.is_completed, false) = false THEN
       RETURN NEW;
     END IF;
-    owner_id := NEW.user_id;
+    target_owner_id := NEW.user_id;
     target_channel_id := NEW.channel_id;
     action_label := coalesce(NEW.interaction_type, 'acción');
     action_result := NEW.result;
@@ -110,14 +110,14 @@ BEGIN
     ) THEN
       RETURN NEW;
     END IF;
-    owner_id := NEW.kam_id;
+    target_owner_id := NEW.kam_id;
     target_channel_id := NEW.channel_id;
     action_label := 'visita planificada';
     action_reason := NEW.notes;
     notification_key := format('delegated-completion:planned-visit:%s', NEW.id);
 
   ELSIF TG_TABLE_NAME = 'visits' THEN
-    owner_id := NEW.kam_id;
+    target_owner_id := NEW.kam_id;
     target_channel_id := NEW.channel_id;
     target_visit_id := NEW.id;
 
@@ -139,11 +139,11 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF owner_id = actor_id OR NOT EXISTS (
+  IF target_owner_id = actor_id OR NOT EXISTS (
     SELECT 1
     FROM public.action_completion_delegates delegation
     WHERE delegation.delegate_id = actor_id
-      AND delegation.owner_id = owner_id
+      AND delegation.owner_id = target_owner_id
   ) THEN
     RETURN NEW;
   END IF;
@@ -191,7 +191,7 @@ BEGIN
     event_key,
     action_path
   ) VALUES (
-    owner_id,
+    target_owner_id,
     target_channel_id,
     target_visit_id,
     'delegated_action_completed',

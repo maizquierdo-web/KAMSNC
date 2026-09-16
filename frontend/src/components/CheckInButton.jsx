@@ -5,7 +5,7 @@ import { useGeolocation, getDistanceMeters } from '../hooks/useGeolocation';
 import { onlineOrQueue } from '../lib/offline';
 import {
   MapPin, Clock, X, Check, Loader2, Camera,
-  Navigation, AlertCircle, Building2, ChevronDown
+  Navigation, AlertCircle, Building2, ChevronDown, CalendarDays
 } from 'lucide-react';
 
 const OBJECTIVES = [
@@ -41,8 +41,18 @@ function setActiveCheckinStorage(data) {
 }
 
 // ============ MODAL DE SELECCIÓN DE CANAL ============
-function ChannelPicker({ channels, position, gpsLoading, gpsError, permissionState, onRetryGps, onSelect, onClose }) {
+function ChannelPicker({ channels, plannedVisits, position, gpsLoading, gpsError, permissionState, onRetryGps, onSelect, onClose }) {
   const [search, setSearch] = useState('');
+
+  const matchesSearch = (name) => search === '' || name?.toLowerCase().includes(search.toLowerCase());
+
+  const scheduled = [...plannedVisits]
+    .filter(plan => matchesSearch(plan.channels?.name))
+    .sort((a, b) => {
+      const aKey = `${a.planned_date || ''}T${a.planned_time || '23:59:59'}`;
+      const bKey = `${b.planned_date || ''}T${b.planned_time || '23:59:59'}`;
+      return aKey.localeCompare(bKey);
+    });
 
   // Ordenar por distancia si tenemos posición
   const sorted = [...channels].map(ch => ({
@@ -54,15 +64,33 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, permissionSta
     if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
     if (a.distance !== null) return -1;
     return 0;
-  }).filter(ch =>
-    search === '' || ch.name.toLowerCase().includes(search.toLowerCase())
-  );
+  }).filter(ch => matchesSearch(ch.name));
+
+  function selectPlannedVisit(plan) {
+    if (!plan.channels) return;
+    onSelect({
+      ...plan.channels,
+      plannedVisitId: plan.id,
+      plannedDate: plan.planned_date,
+      plannedTime: plan.planned_time,
+      plannedNotes: plan.notes,
+    });
+  }
+
+  function formatPlannedDate(plan) {
+    const date = new Date(`${plan.planned_date}T00:00:00`);
+    const dateLabel = Number.isNaN(date.getTime())
+      ? plan.planned_date
+      : date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    const timeLabel = plan.planned_time ? plan.planned_time.slice(0, 5) : 'Sin hora';
+    return `${dateLabel} · ${timeLabel}`;
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
       <div className="bg-surface-1 border border-surface-3 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-surface-3">
-          <h3 className="font-bold">Selecciona el canal</h3>
+          <h3 className="font-bold">Selecciona la visita</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary">
             <X size={20} />
           </button>
@@ -107,13 +135,47 @@ function ChannelPicker({ channels, position, gpsLoading, gpsError, permissionSta
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar canal..."
+            placeholder="Buscar visita o canal..."
             className="w-full px-3 py-2 bg-surface-0 border border-surface-3 rounded-lg text-sm placeholder-text-muted focus:outline-none focus:border-brand-500"
             autoFocus
           />
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
+          <div className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            Visitas programadas
+          </div>
+          {scheduled.map(plan => (
+            <button
+              key={plan.id}
+              type="button"
+              disabled={!position || gpsLoading || !plan.channels}
+              onClick={() => selectPlannedVisit(plan)}
+              className="mb-1 w-full rounded-xl border border-brand-500/20 bg-brand-500/5 p-3 text-left transition-colors hover:bg-brand-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-500/15 text-brand-500">
+                  <CalendarDays size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">{plan.channels?.name || 'Canal no disponible'}</div>
+                  <div className="text-[11px] font-semibold text-brand-500">{formatPlannedDate(plan)}</div>
+                  {plan.notes && <div className="truncate text-[10px] text-text-secondary">{plan.notes}</div>}
+                </div>
+                <span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold text-brand-500">Programada</span>
+              </div>
+            </button>
+          ))}
+          {scheduled.length === 0 && (
+            <div className="px-3 py-4 text-center text-xs text-text-secondary">
+              No hay visitas programadas pendientes
+            </div>
+          )}
+
+          <div className="mx-2 my-2 border-t border-surface-3" />
+          <div className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            Visita no programada
+          </div>
           {sorted.map(ch => (
             <button
               key={ch.id}
@@ -364,6 +426,7 @@ export function CheckInButton({ className = '' }) {
   const { position, loading: gpsLoading, error: gpsError, permissionState, refreshPermission, getPosition } = useGeolocation();
   const [activeCheckin, setActiveCheckin] = useState(getActiveCheckin);
   const [channels, setChannels] = useState([]);
+  const [plannedVisits, setPlannedVisits] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
   const [showVisitForm, setShowVisitForm] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -371,15 +434,31 @@ export function CheckInButton({ className = '' }) {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Cargar canales del KAM
+  // Cargar canales y visitas programadas pendientes del KAM.
   useEffect(() => {
-    if (user) {
+    if (!user) return undefined;
+    let cancelled = false;
+
+    Promise.all([
       supabase
         .from('channels')
         .select('id, name, address, latitude, longitude')
-        .eq('assigned_to', user.id)
-        .then(({ data }) => setChannels(data || []));
-    }
+        .eq('assigned_to', user.id),
+      supabase
+        .from('planned_visits')
+        .select('id, channel_id, planned_date, planned_time, notes, channels(id, name, address, latitude, longitude)')
+        .eq('kam_id', user.id)
+        .eq('is_completed', false)
+        .is('visit_id', null)
+        .order('planned_date')
+        .order('planned_time'),
+    ]).then(([channelResponse, plannedResponse]) => {
+      if (cancelled) return;
+      setChannels(channelResponse.data || []);
+      setPlannedVisits(plannedResponse.data || []);
+    });
+
+    return () => { cancelled = true; };
   }, [user]);
 
   // Toast auto-hide
@@ -440,8 +519,31 @@ export function CheckInButton({ className = '' }) {
 
       if (error) throw error;
 
+      if (selectedChannel.plannedVisitId) {
+        const { error: linkError } = await supabase
+          .from('planned_visits')
+          .update({ visit_id: data.id })
+          .eq('id', selectedChannel.plannedVisitId)
+          .eq('kam_id', user.id)
+          .eq('is_completed', false)
+          .is('visit_id', null)
+          .select('id')
+          .single();
+
+        if (linkError) {
+          await supabase.from('visits').delete().eq('id', data.id);
+          throw new Error(`No se pudo vincular la visita programada: ${linkError.message}`);
+        }
+
+        setPlannedVisits(previous => previous.filter(plan => plan.id !== selectedChannel.plannedVisitId));
+      }
+
       const checkinData = {
         visitId: data.id,
+        plannedVisitId: selectedChannel.plannedVisitId || null,
+        plannedDate: selectedChannel.plannedDate || null,
+        plannedTime: selectedChannel.plannedTime || null,
+        plannedNotes: selectedChannel.plannedNotes || null,
         channelId: selectedChannel.id,
         channelName: selectedChannel.name,
         checkin_at: data.checkin_at,
@@ -488,6 +590,15 @@ export function CheckInButton({ className = '' }) {
 
       if (error) throw error;
 
+      if (activeCheckin.plannedVisitId) {
+        const { error: completionError } = await supabase
+          .from('planned_visits')
+          .update({ visit_id: activeCheckin.visitId, is_completed: true })
+          .eq('id', activeCheckin.plannedVisitId)
+          .eq('kam_id', user.id);
+        if (completionError) throw completionError;
+      }
+
       setActiveCheckin(null);
       setActiveCheckinStorage(null);
       setShowVisitForm(false);
@@ -500,9 +611,41 @@ export function CheckInButton({ className = '' }) {
   // Cancelar visita (descartar)
   async function handleCancelVisit() {
     try {
-      await supabase.from('visits').delete().eq('id', activeCheckin.visitId);
+      if (activeCheckin.plannedVisitId) {
+        const { error: unlinkError } = await supabase
+          .from('planned_visits')
+          .update({ visit_id: null, is_completed: false })
+          .eq('id', activeCheckin.plannedVisitId)
+          .eq('kam_id', user.id);
+        if (unlinkError) throw unlinkError;
+      }
+
+      const { error: deleteError } = await supabase.from('visits').delete().eq('id', activeCheckin.visitId);
+      if (deleteError) throw deleteError;
+
+      if (activeCheckin.plannedVisitId) {
+        const channel = channels.find(item => item.id === activeCheckin.channelId);
+        setPlannedVisits(previous => previous.some(plan => plan.id === activeCheckin.plannedVisitId)
+          ? previous
+          : [...previous, {
+            id: activeCheckin.plannedVisitId,
+            channel_id: activeCheckin.channelId,
+            planned_date: activeCheckin.plannedDate,
+            planned_time: activeCheckin.plannedTime,
+            notes: activeCheckin.plannedNotes,
+            channels: channel || {
+              id: activeCheckin.channelId,
+              name: activeCheckin.channelName,
+              address: null,
+              latitude: null,
+              longitude: null,
+            },
+          }]);
+      }
     } catch (err) {
       console.error('Error descartando visita:', err);
+      setToast({ type: 'error', message: 'No se ha podido descartar la visita: ' + err.message });
+      return;
     }
     setActiveCheckin(null);
     setActiveCheckinStorage(null);
@@ -566,6 +709,7 @@ export function CheckInButton({ className = '' }) {
       {showPicker && (
         <ChannelPicker
           channels={channels}
+          plannedVisits={plannedVisits}
           position={position}
           gpsLoading={gpsLoading}
           gpsError={gpsError}
@@ -585,6 +729,13 @@ export function CheckInButton({ className = '' }) {
               {selectedChannel.name}
               {distanceToChannel !== null && ` · ${distanceToChannel}m de distancia`}
             </p>
+
+            {selectedChannel.plannedVisitId && (
+              <div className="mb-4 rounded-xl border border-brand-500/20 bg-brand-500/5 px-3 py-2 text-center text-xs font-semibold text-brand-500">
+                Visita programada · {selectedChannel.plannedDate}
+                {selectedChannel.plannedTime ? ` · ${selectedChannel.plannedTime.slice(0, 5)}` : ''}
+              </div>
+            )}
 
             <div className="flex items-center justify-center mb-5">
               <div className="w-20 h-20 rounded-full bg-brand-500/20 flex items-center justify-center">

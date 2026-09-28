@@ -11,7 +11,7 @@ export default function ChannelBusinessCasePrompt({ channelId, isCaes = false, v
       setMissing(false);
       return () => { active = false; };
     }
-    supabase.from('business_cases').select('id').eq('channel_id', channelId).limit(1)
+    supabase.from('business_cases').select('id').eq('channel_id', channelId).eq('document_type', 'business_case').limit(1)
       .then(({ data, error }) => {
         if (error) throw error;
         if (active) setMissing(!data?.length);

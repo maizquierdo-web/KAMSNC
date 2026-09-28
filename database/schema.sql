@@ -205,8 +205,10 @@ CREATE TABLE channels (
   caes_contract_model    text,
   caes_remuneration_tier text,
   onboarding_status_changed_at timestamptz,
+  caes_platform         text,
   caes_technical_office text,
-  caes_verifier         text
+  caes_verifier         text,
+  caes_order_number     text
 );
 
 CREATE TABLE kam_playbook (

@@ -44,7 +44,7 @@ export default function PreVisitBrief({ channelId, channelName }) {
         supabase.from('visits').select('*, channels(name)')
           .eq('channel_id', channelId).order('checkin_at', { ascending: false }).limit(10),
         supabase.from('business_cases').select('file_name, updated_at')
-          .eq('channel_id', channelId).limit(1),
+          .eq('channel_id', channelId).eq('document_type', 'business_case').limit(1),
         supabase.from('alerts').select('*')
           .eq('channel_id', channelId).eq('is_dismissed', false),
         supabase.from('kam_playbook').select('section, content')

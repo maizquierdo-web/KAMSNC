@@ -92,6 +92,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
   const [formMode, setFormMode] = useState(null); // 'register' | 'plan' | 'note' | null
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
+  const [feedback, setFeedback] = useState(null);
   const [newForm, setNewForm] = useState({
     interaction_type: 'call', direction: 'outbound', subject: '', notes: '',
     duration_minutes: '', result: '', contact_person: '',
@@ -106,26 +107,35 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
     setNewForm(prev => ({ ...prev, contact_person: channel?.contact_name || '' }));
   }, [channel?.contact_name]);
 
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timeout = setTimeout(() => setFeedback(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [feedback]);
+
   async function loadAll() {
     setLoading(true);
     try {
-      const [visitsRes, interRes, notesRes, meetingsRes] = await Promise.allSettled([
+      const [visitsRes, interRes, notesRes, meetingsRes, plannedVisitsRes] = await Promise.allSettled([
         supabase.from('visits').select('*').eq('channel_id', channel.id).order('checkin_at', { ascending: false }).limit(50),
         supabase.from('channel_interactions').select('*, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('channel_notes').select('*, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('channel_meetings').select('*, profiles(full_name)').eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(50),
+        supabase.from('planned_visits').select('*').eq('channel_id', channel.id).eq('is_completed', false).is('visit_id', null).order('planned_date', { ascending: true }),
       ]);
 
       const visits = (visitsRes.status === 'fulfilled' ? visitsRes.value.data : []) || [];
       const interactions = (interRes.status === 'fulfilled' ? interRes.value.data : []) || [];
       const notes = (notesRes.status === 'fulfilled' ? notesRes.value.data : []) || [];
       const meetings = (meetingsRes.status === 'fulfilled' ? meetingsRes.value.data : []) || [];
+      const plannedVisits = (plannedVisitsRes.status === 'fulfilled' ? plannedVisitsRes.value.data : []) || [];
 
       const authorIds = [...new Set([
         ...visits.map(item => item.kam_id),
         ...interactions.map(item => item.user_id),
         ...notes.map(item => item.user_id),
         ...meetings.map(item => item.uploaded_by),
+        ...plannedVisits.map(item => item.kam_id),
       ].filter(Boolean))];
       const { data: authorProfiles, error: authorError } = authorIds.length
         ? await supabase.from('profiles').select('id, full_name').in('id', authorIds)
@@ -138,12 +148,23 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
       const completedInter = interactions.filter(i => i.is_completed === true || (i.is_completed !== false && !i.planned_date));
       const plannedInter = interactions.filter(i => i.is_completed === false || (i.planned_date && i.is_completed !== true));
 
-      setPlanned(plannedInter.map(item => ({
-        ...item,
-        authorName: resolveAuthor(item.user_id, item.profiles),
-      })).sort((a, b) => {
+      setPlanned([
+        ...plannedInter.map(item => ({
+          ...item,
+          _source: 'channel_interactions',
+          authorName: resolveAuthor(item.user_id, item.profiles),
+        })),
+        ...plannedVisits.map(item => ({
+          ...item,
+          _source: 'planned_visits',
+          interaction_type: 'visit',
+          user_id: item.kam_id,
+          authorName: resolveAuthor(item.kam_id),
+        })),
+      ].sort((a, b) => {
         const da = a.planned_date || '9999'; const db = b.planned_date || '9999';
-        return da.localeCompare(db);
+        if (da !== db) return da.localeCompare(db);
+        return (a.planned_time || '').localeCompare(b.planned_time || '');
       }));
 
       const merged = [
@@ -179,6 +200,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
   async function saveInteraction(isPlanned) {
     if (!channel?.id || !user?.id) return;
     setSavingForm(true);
+    setFeedback(null);
     try {
       const record = {
         channel_id: channel.id, user_id: user.id,
@@ -192,8 +214,20 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
         record.planned_date = newForm.planned_date;
         record.planned_time = newForm.planned_time ? newForm.planned_time + ':00' : null;
       }
-      const { error } = await supabase.from('channel_interactions').insert(record);
-      if (error) throw error;
+      if (isPlanned && newForm.interaction_type === 'visit') {
+        const { error } = await supabase.from('planned_visits').insert({
+          channel_id: channel.id,
+          kam_id: user.id,
+          planned_date: newForm.planned_date,
+          planned_time: newForm.planned_time ? `${newForm.planned_time}:00` : null,
+          notes: newForm.notes || null,
+          is_completed: false,
+        }).select('id').single();
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('channel_interactions').insert(record).select('id').single();
+        if (error) throw error;
+      }
       if (!isPlanned && newForm.next_action_date) {
         const { error: nextActionError } = await supabase.from('channel_interactions').insert({
           channel_id: channel.id,
@@ -209,26 +243,44 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
         if (nextActionError) throw nextActionError;
       }
       resetForm();
-      loadAll();
+      await loadAll();
       onActivityChange?.();
-    } catch (err) { console.error(err); }
+      setFeedback({ type: 'success', message: isPlanned ? 'Acción planificada correctamente' : 'Actividad registrada correctamente' });
+    } catch (err) {
+      console.error(err);
+      setFeedback({ type: 'error', message: `No se pudo guardar: ${err.message}` });
+    }
     finally { setSavingForm(false); }
   }
 
-  async function completePlanned(id) {
+  async function completePlanned(item) {
     try {
-      await supabase.from('channel_interactions').update({ is_completed: true }).eq('id', id);
-      loadAll();
+      const table = item._source === 'planned_visits' ? 'planned_visits' : 'channel_interactions';
+      const { data, error } = await supabase.from(table).update({ is_completed: true }).eq('id', item.id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('La acción no se ha actualizado. Comprueba tus permisos.');
+      await loadAll();
       onActivityChange?.();
-    } catch (err) { console.error(err); }
+      setFeedback({ type: 'success', message: 'Acción completada' });
+    } catch (err) {
+      console.error(err);
+      setFeedback({ type: 'error', message: `No se pudo completar: ${err.message}` });
+    }
   }
 
-  async function deletePlanned(id) {
+  async function deletePlanned(item) {
     try {
-      await supabase.from('channel_interactions').delete().eq('id', id);
-      loadAll();
+      const table = item._source === 'planned_visits' ? 'planned_visits' : 'channel_interactions';
+      const { data, error } = await supabase.from(table).delete().eq('id', item.id).select('id');
+      if (error) throw error;
+      if (!data?.length) throw new Error('La acción no se ha eliminado. Comprueba tus permisos.');
+      await loadAll();
       onActivityChange?.();
-    } catch (err) { console.error(err); }
+      setFeedback({ type: 'success', message: 'Acción eliminada' });
+    } catch (err) {
+      console.error(err);
+      setFeedback({ type: 'error', message: `No se pudo eliminar: ${err.message}` });
+    }
   }
 
   async function saveNote() {
@@ -355,6 +407,16 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
           </div>
         </div>
       </div>
+
+      {feedback && (
+        <div className={`mx-3 mt-3 rounded-lg border px-3 py-2 text-xs font-semibold ${
+          feedback.type === 'success'
+            ? 'border-green-200 bg-green-50 text-green-700'
+            : 'border-red-200 bg-red-50 text-red-700'
+        }`} role="status">
+          {feedback.message}
+        </div>
+      )}
 
       {/* Note input */}
       {formMode === 'note' && (
@@ -504,11 +566,11 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
                     <div className="text-[10px] font-semibold text-navy-600">{item.planned_date ? formatPlannedDate(item.planned_date) : ''}</div>
                     {item.planned_time && <div className="text-[9px] text-text-muted">{item.planned_time.slice(0,5)}</div>}
                   </div>
-                  <button onClick={() => completePlanned(item.id)}
+                  <button onClick={() => completePlanned(item)}
                     className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-600 rounded text-[9px] font-bold flex-shrink-0 transition-colors">
                     ✓ Hecho
                   </button>
-                  <button onClick={() => deletePlanned(item.id)}
+                  <button onClick={() => deletePlanned(item)}
                     className="p-1 text-text-muted hover:text-red-400 transition-colors flex-shrink-0">
                     <X size={12} />
                   </button>

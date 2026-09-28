@@ -51,14 +51,17 @@ CREATE TABLE account_plans (
 
 CREATE TABLE business_cases (
   id                     uuid NOT NULL DEFAULT gen_random_uuid(),
-  channel_id             uuid NOT NULL UNIQUE,
+  channel_id             uuid NOT NULL,
   file_name              text NOT NULL,
   storage_path           text NOT NULL,
   file_size              integer,
   file_type              text,
   uploaded_by            uuid NOT NULL,
+  document_type          text NOT NULL DEFAULT 'business_case'::text,
+  extracted_text         text,
   created_at             timestamptz DEFAULT now(),
-  updated_at             timestamptz DEFAULT now()
+  updated_at             timestamptz DEFAULT now(),
+  UNIQUE (channel_id, document_type)
 );
 
 CREATE TABLE alerts (

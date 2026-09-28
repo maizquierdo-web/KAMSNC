@@ -15,6 +15,12 @@ const VERIFIERS = [
   { value: 'unassigned', label: 'Sin verificador asignado' },
 ];
 
+const PLATFORMS = [
+  { value: 'mascara', label: 'Máscara' },
+  { value: 'natureco', label: 'Natureco' },
+  { value: 'smartfy', label: 'Smartfy' },
+];
+
 const ONBOARDING_OPTIONS = [
   { value: 'pending', label: 'Sin informar' },
   { value: 'documentation_requested', label: 'Documentación solicitada al canal' },
@@ -58,6 +64,7 @@ function Field({ label, value, options, disabled, onChange, required = false }) 
 export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
   const [values, setValues] = useState({
     onboarding_status: channel.onboarding_status || 'pending',
+    caes_platform: channel.caes_platform || '',
     caes_role: channel.caes_role || 'pending',
     caes_contract_model: channel.caes_contract_model || 'pending',
     caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
@@ -72,6 +79,7 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
   useEffect(() => {
     setValues({
       onboarding_status: channel.onboarding_status || 'pending',
+      caes_platform: channel.caes_platform || '',
       caes_role: channel.caes_role || 'pending',
       caes_contract_model: channel.caes_contract_model || 'pending',
       caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
@@ -79,7 +87,7 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       caes_verifier: channel.caes_verifier || 'unassigned',
       caes_order_number: channel.caes_order_number || '',
     });
-  }, [channel.id, channel.onboarding_status, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier, channel.caes_order_number]);
+  }, [channel.id, channel.onboarding_status, channel.caes_platform, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier, channel.caes_order_number]);
 
   async function updateField(field, value, previousValue) {
     const previous = previousValue === undefined ? values[field] : previousValue;
@@ -126,13 +134,14 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
     {error && <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-[10px] text-red-600">{error}</div>}
     <div className="grid grid-cols-1 gap-3 p-3.5 md:grid-cols-2 xl:grid-cols-3">
       <Field label="Estado del alta" value={values.onboarding_status} options={ONBOARDING_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('onboarding_status', value)} />
+      <Field label="Plataforma" value={values.caes_platform} options={[{ value: '', label: 'Sin informar' }, ...PLATFORMS]} disabled={Boolean(savingField)} onChange={value => updateField('caes_platform', value)} />
       <Field label="Rol" value={values.caes_role} options={CAES_ROLE_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('caes_role', value)} />
       <Field label="Modelo de contrato" value={values.caes_contract_model} options={CONTRACT_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('caes_contract_model', value)} />
       <Field label="Tramo retributivo" value={values.caes_remuneration_tier} options={TIER_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('caes_remuneration_tier', value)} />
-      <Field label="Oficina técnica" value={values.caes_technical_office} options={TECHNICAL_OFFICES} required disabled={Boolean(savingField)} onChange={value => updateField('caes_technical_office', value)} />
-      <Field label="Verificador" value={values.caes_verifier} options={VERIFIERS} required disabled={Boolean(savingField)} onChange={value => updateField('caes_verifier', value)} />
+      <Field label="Oficina técnica" value={values.caes_technical_office} options={TECHNICAL_OFFICES} disabled={Boolean(savingField)} onChange={value => updateField('caes_technical_office', value)} />
+      <Field label="Verificador" value={values.caes_verifier} options={VERIFIERS} disabled={Boolean(savingField)} onChange={value => updateField('caes_verifier', value)} />
       <label className="block min-w-0">
-        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">Número de Pedido · opcional</span>
+        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">Número de Pedido · obligatorio</span>
         <input type="text" value={values.caes_order_number} disabled={Boolean(savingField)}
           onChange={event => setValues(current => ({ ...current, caes_order_number: event.target.value }))}
           onBlur={event => {

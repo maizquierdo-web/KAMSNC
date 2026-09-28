@@ -52,6 +52,7 @@ const CONTRACT_LABELS = { model_2_alternative_payer: 'Modelo 2 · Pagador altern
 const TIER_LABELS = { tier_a: 'Tramo A', tier_b: 'Tramo B', tier_c: 'Tramo C' };
 const OFFICE_LABELS = { sinceo2: 'SINCEO2', e_program: 'E-PROGRAM', unassigned: 'Sin OT asignada' };
 const VERIFIER_LABELS = { margube: 'MARGUBE', eqa: 'EQA', oca: 'OCA', unassigned: 'Sin verificador asignado' };
+const PLATFORM_LABELS = { mascara: 'Máscara', natureco: 'Natureco', smartfy: 'Smartfy' };
 
 function dateLabel(value) {
   return value ? new Date(value).toLocaleDateString('es-ES') : '';
@@ -93,6 +94,7 @@ const CHANNEL_FIELDS = [
   { id: 'caes_type', label: 'Tipo de canal CAEs', group: 'Información CAEs', caesOnly: true, value: row => row.canal_caes_type || row.tipo_canal_caes || '' },
   { id: 'caes_sector', label: 'Sector CAEs objetivo', group: 'Información CAEs', caesOnly: true, value: row => listLabel(row.sector_cae_objetivo || row.sector_cae) },
   { id: 'caes_potential', label: 'Potencial CAEs', group: 'Información CAEs', caesOnly: true, value: row => row.potencial_caes || '' },
+  { id: 'caes_platform', label: 'Plataforma', group: 'Información CAEs', caesOnly: true, value: row => PLATFORM_LABELS[row.caes_platform] || row.caes_platform || '' },
   { id: 'caes_role', label: 'Rol CAEs', group: 'Información CAEs', caesOnly: true, value: row => CAES_ROLE_LABELS[row.caes_role] || row.caes_role || '' },
   { id: 'caes_contract_model', label: 'Modelo de contrato CAEs', group: 'Información CAEs', caesOnly: true, value: row => CONTRACT_LABELS[row.caes_contract_model] || row.caes_contract_model || '' },
   { id: 'caes_remuneration_tier', label: 'Tramo retributivo CAEs', group: 'Información CAEs', caesOnly: true, value: row => TIER_LABELS[row.caes_remuneration_tier] || row.caes_remuneration_tier || '' },

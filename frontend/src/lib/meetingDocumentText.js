@@ -6,6 +6,44 @@ function compact(text) {
   return String(text || '').replace(/\s+/g, ' ').trim().slice(0, MAX_EXTRACTED_CHARACTERS);
 }
 
+function structuredTextFromHtml(html) {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const blocks = [];
+
+  document.body.querySelectorAll(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > ul, :scope > ol, :scope > table').forEach(node => {
+    if (node.tagName === 'TABLE') {
+      const rows = [...node.querySelectorAll('tr')]
+        .map(row => [...row.querySelectorAll(':scope > th, :scope > td')].map(cell => cell.textContent.replace(/\s+/g, ' ').trim()))
+        .filter(row => row.some(Boolean));
+      if (!rows.length) return;
+      if (rows.length === 1) {
+        blocks.push(rows[0].filter(Boolean).join(' | '));
+        return;
+      }
+      const headers = rows[0];
+      blocks.push(headers.filter(Boolean).join(' | '));
+      rows.slice(1).forEach(row => {
+        const values = row.map((value, index) => value ? `${headers[index] || `Campo ${index + 1}`}: ${value}` : '').filter(Boolean);
+        if (values.length) blocks.push(`- ${values.join(' | ')}`);
+      });
+      return;
+    }
+
+    if (node.matches('ul, ol')) {
+      [...node.querySelectorAll(':scope > li')].forEach(item => {
+        const value = item.textContent.replace(/\s+/g, ' ').trim();
+        if (value) blocks.push(`- ${value}`);
+      });
+      return;
+    }
+
+    const value = node.textContent.replace(/\s+/g, ' ').trim();
+    if (value) blocks.push(value);
+  });
+
+  return blocks.join('\n').trim().slice(0, MAX_EXTRACTED_CHARACTERS);
+}
+
 export async function extractMeetingDocumentText(file) {
   if (!file) return { text: '', supported: false };
   const extension = file.name.split('.').pop()?.toLowerCase();
@@ -16,8 +54,8 @@ export async function extractMeetingDocumentText(file) {
 
   if (extension === 'docx') {
     const mammoth = await import('mammoth/mammoth.browser');
-    const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
-    return { text: compact(result.value), supported: true };
+    const result = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+    return { text: structuredTextFromHtml(result.value), supported: true };
   }
 
   if (extension === 'pdf') {

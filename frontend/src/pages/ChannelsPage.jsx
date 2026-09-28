@@ -825,6 +825,10 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <BusinessCase channelId={channelId} />
       </div>
 
+      <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
+        <BusinessCase channelId={channelId} documentType="hunter_canvas" />
+      </div>
+
       <div className="mb-3">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
       </div>

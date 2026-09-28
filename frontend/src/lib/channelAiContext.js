@@ -35,6 +35,16 @@ function compact(value, limit = 500) {
   return String(value).replace(/\s+/g, ' ').trim().slice(0, limit);
 }
 
+function compactStructured(value, limit = 12000) {
+  if (!value) return '-';
+  return String(value)
+    .split(/\r?\n/)
+    .map(line => line.replace(/[ \t]+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, limit);
+}
+
 function resultData(result) {
   return result?.error ? [] : (result?.data || []);
 }
@@ -52,7 +62,7 @@ function caesValue(field, value) {
 export async function loadChannelAiContext(channel, client = supabase) {
   const [
     classRes, interactionsRes, visitsRes, plannedVisitsRes, notesRes, meetingsRes,
-    historyRes, businessCaseRes, profileRes, memoryRes, benchmarkSourcesRes,
+    historyRes, commercialDocumentsRes, profileRes, memoryRes, benchmarkSourcesRes,
   ] = await Promise.all([
     client.from('channel_classifications').select('custom_text, channel_classification(canal, subcanal, tipo)').eq('channel_id', channel.id),
     client.from('channel_interactions').select('interaction_type, direction, subject, notes, result, contact_person, created_at, planned_date, planned_time, is_completed').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(20),
@@ -61,7 +71,7 @@ export async function loadChannelAiContext(channel, client = supabase) {
     client.from('channel_notes').select('content, created_at, profiles(full_name)').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
     client.from('channel_meetings').select('meeting_date, attendees, notes, file_url, file_name, file_size, created_at').eq('channel_id', channel.id).order('meeting_date', { ascending: false }).limit(15),
     client.from('channel_pipeline_history').select('from_stage, to_stage, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(10),
-    client.from('business_cases').select('file_name, updated_at').eq('channel_id', channel.id).maybeSingle(),
+    client.from('business_cases').select('document_type, file_name, updated_at, extracted_text').eq('channel_id', channel.id).in('document_type', ['business_case', 'hunter_canvas']),
     client.from('profiles').select('full_name, zone').eq('id', channel.assigned_to).maybeSingle(),
     client.from('channel_copilot_messages').select('id, role, content, created_at').eq('channel_id', channel.id).order('created_at', { ascending: false }).limit(40),
     client.from('benchmark_sources').select('id, title, source_date').eq('channel_id', channel.id).order('source_date', { ascending: false }).limit(10),
@@ -91,7 +101,9 @@ export async function loadChannelAiContext(channel, client = supabase) {
     }
   }));
   const history = resultData(historyRes);
-  const businessCase = businessCaseRes?.error ? null : businessCaseRes?.data;
+  const commercialDocuments = resultData(commercialDocumentsRes);
+  const businessCase = commercialDocuments.find(document => document.document_type === 'business_case') || null;
+  const hunterCanvas = commercialDocuments.find(document => document.document_type === 'hunter_canvas') || null;
   const responsible = profileRes?.error ? null : profileRes?.data;
   const savedMessages = memoryRes?.error ? [] : resultData(memoryRes).reverse().map(message => ({
     id: message.id,
@@ -169,6 +181,11 @@ ${history.length ? history.map(item => `- ${dateLabel(item.created_at)} · ${ite
 BUSINESS CASE
 ${businessCase ? `Adjunto: ${businessCase.file_name} · Actualizado: ${dateLabel(businessCase.updated_at)}. El contenido interno del archivo no está disponible.` : 'No adjuntado'}
 
+HUNTER CANVAS
+${hunterCanvas
+    ? `Documento: ${hunterCanvas.file_name} · Actualizado: ${dateLabel(hunterCanvas.updated_at)}\n${hunterCanvas.extracted_text ? compactStructured(hunterCanvas.extracted_text) : 'El documento está adjunto, pero no dispone de texto legible para la IA.'}`
+    : 'No adjuntado'}
+
 MEMORIA APORTADA POR USUARIOS
 ${userMemory.length ? userMemory.map(message => `- ${dateLabel(message.createdAt)} · ${compact(message.text, 700)}`).join('\n') : '- Sin aportaciones guardadas'}
 
@@ -185,7 +202,7 @@ ${benchmarkEntries.length ? benchmarkEntries.map(entry => {
     stats: {
       activities: completedInteractions.length + visits.length + notes.length,
       meetings: meetings.length,
-      documents: (businessCase ? 1 : 0) + meetings.filter(item => item.file_name).length,
+      documents: commercialDocuments.length + meetings.filter(item => item.file_name).length,
     },
   };
 }

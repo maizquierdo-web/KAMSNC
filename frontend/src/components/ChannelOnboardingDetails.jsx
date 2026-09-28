@@ -31,6 +31,12 @@ const TIER_OPTIONS = [
   { value: 'tier_c', label: 'Tramo C' },
 ];
 
+const PLATFORM_OPTIONS = [
+  { value: 'mascara', label: 'Máscara' },
+  { value: 'natureco', label: 'Natureco' },
+  { value: 'smartfy', label: 'Smartfy' },
+];
+
 function daysSince(value) {
   if (!value) return 0;
   const then = new Date(value);
@@ -46,7 +52,7 @@ function Field({ label, value, options, onChange, disabled, required = false }) 
       <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">{label}</span>
       <select value={value || ''} onChange={event => onChange(event.target.value || null)} disabled={disabled}
         className="w-full rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-xs font-semibold text-text-primary focus:border-navy-500 focus:outline-none disabled:opacity-60">
-        {!required && <option value="">Seleccionar…</option>}
+        <option value="" disabled={required}>Seleccionar…</option>
         {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
@@ -56,6 +62,7 @@ function Field({ label, value, options, onChange, disabled, required = false }) 
 export default function ChannelOnboardingDetails({ channel, isCaes = false, onUpdate }) {
   const [values, setValues] = useState({
     onboarding_status: channel.onboarding_status || '',
+    caes_platform: channel.caes_platform || '',
     caes_role: channel.caes_role || 'pending',
     caes_contract_model: channel.caes_contract_model || 'pending',
     caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
@@ -68,11 +75,12 @@ export default function ChannelOnboardingDetails({ channel, isCaes = false, onUp
   useEffect(() => {
     setValues({
       onboarding_status: channel.onboarding_status || '',
+      caes_platform: channel.caes_platform || '',
       caes_role: channel.caes_role || 'pending',
       caes_contract_model: channel.caes_contract_model || 'pending',
       caes_remuneration_tier: channel.caes_remuneration_tier || 'pending',
     });
-  }, [channel.id, channel.onboarding_status, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier]);
+  }, [channel.id, channel.onboarding_status, channel.caes_platform, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier]);
 
   async function updateField(field, value) {
     const previous = values[field];
@@ -126,6 +134,8 @@ export default function ChannelOnboardingDetails({ channel, isCaes = false, onUp
         <Field label="Estado del alta · obligatorio" value={values.onboarding_status || 'documentation_requested'} options={ONBOARDING_OPTIONS} required
           disabled={Boolean(savingField)} onChange={value => updateField('onboarding_status', value)} />
         {isCaes && <>
+          <Field label="Plataforma · obligatorio" value={values.caes_platform} options={PLATFORM_OPTIONS} required
+            disabled={Boolean(savingField)} onChange={value => updateField('caes_platform', value)} />
           <Field label="Rol" value={values.caes_role} options={CAES_ROLE_OPTIONS}
             disabled={Boolean(savingField)} onChange={value => updateField('caes_role', value)} />
           <Field label="Modelo de contrato" value={values.caes_contract_model} options={CONTRACT_OPTIONS}

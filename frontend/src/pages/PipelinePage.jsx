@@ -894,18 +894,20 @@ const CONTRACT_OPTIONS = [['pending', 'Pendiente de definir'], ['model_2_alterna
 const TIER_OPTIONS = [['pending', 'Pendiente de definir'], ['tier_a', 'Tramo A'], ['tier_b', 'Tramo B'], ['tier_c', 'Tramo C']];
 const OFFICE_OPTIONS = [['sinceo2', 'SINCEO2'], ['e_program', 'E-PROGRAM'], ['unassigned', 'Sin OT asignada']];
 const VERIFIER_OPTIONS = [['margube', 'MARGUBE'], ['eqa', 'EQA'], ['oca', 'OCA'], ['unassigned', 'Sin verificador asignado']];
+const PLATFORM_OPTIONS = [['mascara', 'Máscara'], ['natureco', 'Natureco'], ['smartfy', 'Smartfy']];
 
 function TransitionField({ label, value, options, onChange, required = true }) {
   return <label className="block"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}{required ? ' *' : ''}</span>
     <select value={value} onChange={event => onChange(event.target.value)} className="w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
+      {required && <option value="" disabled>Seleccionar…</option>}
       {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
     </select>
   </label>;
 }
 
-function TransitionTextField({ label, value, onChange }) {
+function TransitionTextField({ label, value, onChange, required = false }) {
   return <label className="block">
-    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label} · opcional</span>
+    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}{required ? ' *' : ' · opcional'}</span>
     <input type="text" value={value} onChange={event => onChange(event.target.value)}
       className="w-full rounded-xl border border-surface-3 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"
       placeholder="Introducir número de pedido" />
@@ -915,6 +917,7 @@ function TransitionTextField({ label, value, onChange }) {
 function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel }) {
   const [values, setValues] = useState(kind === 'onboarding' ? {
     onboarding_status: channel?.onboarding_status || 'documentation_requested',
+    caes_platform: channel?.caes_platform || '',
     caes_role: channel?.caes_role || 'pending',
     caes_contract_model: channel?.caes_contract_model || 'pending',
     caes_remuneration_tier: channel?.caes_remuneration_tier || 'pending',
@@ -923,8 +926,17 @@ function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel })
     caes_verifier: channel?.caes_verifier || 'unassigned',
     caes_order_number: channel?.caes_order_number || '',
   });
+  const [validationError, setValidationError] = useState('');
   const update = (field, value) => setValues(current => ({ ...current, [field]: value }));
   const confirm = () => {
+    if (kind === 'onboarding' && isCaes && !values.caes_platform) {
+      setValidationError('Selecciona la plataforma antes de iniciar el proceso de alta.');
+      return;
+    }
+    if (kind === 'active' && !values.caes_order_number.trim()) {
+      setValidationError('Introduce el número de pedido antes de activar el canal.');
+      return;
+    }
     const stored = Object.fromEntries(Object.entries(values).map(([key, value]) => [key, value === 'pending' || value === '' ? null : value]));
     if (kind === 'onboarding') stored.onboarding_status_changed_at = new Date().toISOString();
     onConfirm(stored);
@@ -938,16 +950,18 @@ function PipelineTransitionModal({ channel, kind, isCaes, onConfirm, onCancel })
         {kind === 'onboarding' ? <>
           <div className={isCaes ? 'sm:col-span-2' : ''}><TransitionField label="Estado del alta" value={values.onboarding_status} options={ONBOARDING_OPTIONS} onChange={value => update('onboarding_status', value)} /></div>
           {isCaes && <>
+            <div className="sm:col-span-2"><TransitionField label="Plataforma" value={values.caes_platform} options={PLATFORM_OPTIONS} onChange={value => { update('caes_platform', value); setValidationError(''); }} /></div>
             <TransitionField label="Rol" value={values.caes_role} options={ROLE_OPTIONS} onChange={value => update('caes_role', value)} />
             <TransitionField label="Modelo de contrato" value={values.caes_contract_model} options={CONTRACT_OPTIONS} onChange={value => update('caes_contract_model', value)} />
             <TransitionField label="Tramo retributivo" value={values.caes_remuneration_tier} options={TIER_OPTIONS} onChange={value => update('caes_remuneration_tier', value)} />
           </>}
         </> : <>
-          <TransitionField label="Oficina técnica" value={values.caes_technical_office} options={OFFICE_OPTIONS} onChange={value => update('caes_technical_office', value)} />
-          <TransitionField label="Verificador" value={values.caes_verifier} options={VERIFIER_OPTIONS} onChange={value => update('caes_verifier', value)} />
-          <div className="sm:col-span-2"><TransitionTextField label="Número de Pedido" value={values.caes_order_number} onChange={value => update('caes_order_number', value)} /></div>
+          <TransitionField label="Oficina técnica" value={values.caes_technical_office} options={OFFICE_OPTIONS} required={false} onChange={value => update('caes_technical_office', value)} />
+          <TransitionField label="Verificador" value={values.caes_verifier} options={VERIFIER_OPTIONS} required={false} onChange={value => update('caes_verifier', value)} />
+          <div className="sm:col-span-2"><TransitionTextField label="Número de Pedido" value={values.caes_order_number} required onChange={value => { update('caes_order_number', value); setValidationError(''); }} /></div>
         </>}
       </div>
+      {validationError && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{validationError}</p>}
       <div className="mt-5 flex gap-2">
         <button onClick={onCancel} className="flex-1 rounded-xl border border-surface-3 py-2.5 text-sm font-semibold text-text-secondary hover:bg-surface-1">Cancelar</button>
         <button onClick={confirm} className="flex-1 rounded-xl bg-brand-500 py-2.5 text-sm font-bold text-white hover:bg-brand-600">Confirmar y mover</button>

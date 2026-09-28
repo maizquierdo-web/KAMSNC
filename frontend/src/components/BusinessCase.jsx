@@ -1,7 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink, FileText, Loader2, RefreshCw, Upload } from 'lucide-react';
+import { ExternalLink, FileText, Loader2, RefreshCw, Target, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from './AuthProvider';
+import { extractMeetingDocumentText } from '../lib/meetingDocumentText';
+
+const DOCUMENT_CONFIG = {
+  business_case: {
+    title: 'Business Case',
+    missingTitle: 'Business Case no adjuntado',
+    description: 'Adjunta el Business Case para centralizar la información económica y comercial del canal.',
+    uploadLabel: 'Adjuntar Business Case',
+    icon: FileText,
+    accept: '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx',
+    requiresReadableText: false,
+  },
+  hunter_canvas: {
+    title: 'Hunter Canvas',
+    missingTitle: 'Hunter Canvas no adjuntado',
+    description: 'Adjunta el Hunter Canvas para incorporar su contenido al análisis y a las recomendaciones de IA.',
+    uploadLabel: 'Adjuntar Hunter Canvas',
+    icon: Target,
+    accept: '.pdf,.docx,.xls,.xlsx,.txt,.md,.csv',
+    requiresReadableText: true,
+  },
+};
 
 function formatFileSize(bytes) {
   if (!bytes) return '';
@@ -10,8 +32,10 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-export default function BusinessCase({ channelId }) {
+export default function BusinessCase({ channelId, documentType = 'business_case' }) {
   const { user } = useAuthContext();
+  const config = DOCUMENT_CONFIG[documentType] || DOCUMENT_CONFIG.business_case;
+  const DocumentIcon = config.icon;
   const inputRef = useRef(null);
   const [businessCase, setBusinessCase] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +44,7 @@ export default function BusinessCase({ channelId }) {
 
   useEffect(() => {
     if (channelId) loadBusinessCase();
-  }, [channelId]);
+  }, [channelId, documentType]);
 
   async function loadBusinessCase() {
     setLoading(true);
@@ -29,12 +53,13 @@ export default function BusinessCase({ channelId }) {
         .from('business_cases')
         .select('*')
         .eq('channel_id', channelId)
+        .eq('document_type', documentType)
         .maybeSingle();
 
       if (error) throw error;
       setBusinessCase(data);
     } catch (error) {
-      console.error('Error cargando Business Case:', error);
+      console.error(`Error cargando ${config.title}:`, error);
     } finally {
       setLoading(false);
     }
@@ -51,8 +76,8 @@ export default function BusinessCase({ channelId }) {
       if (error) throw error;
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      console.error('Error abriendo Business Case:', error);
-      alert('No se pudo abrir el Business Case: ' + error.message);
+      console.error(`Error abriendo ${config.title}:`, error);
+      alert(`No se pudo abrir el ${config.title}: ${error.message}`);
     } finally {
       setOpening(false);
     }
@@ -63,9 +88,19 @@ export default function BusinessCase({ channelId }) {
     if (!file || !channelId || !user) return;
 
     setUploading(true);
-    const storagePath = `${channelId}/${Date.now()}_${file.name}`;
+    const extension = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    const storagePath = `${channelId}/${documentType}/${Date.now()}.${extension}`;
 
     try {
+      let extractedText = null;
+      if (config.requiresReadableText) {
+        const extracted = await extractMeetingDocumentText(file);
+        extractedText = extracted.text?.trim() || '';
+        if (!extracted.supported || !extractedText) {
+          throw new Error('El archivo no contiene texto que la IA pueda leer. Usa un DOCX, XLSX, TXT o un PDF con texto seleccionable.');
+        }
+      }
+
       const { error: uploadError } = await supabase.storage
         .from('business-cases')
         .upload(storagePath, file);
@@ -74,17 +109,19 @@ export default function BusinessCase({ channelId }) {
 
       const record = {
         channel_id: channelId,
+        document_type: documentType,
         file_name: file.name,
         storage_path: storagePath,
         file_size: file.size,
         file_type: file.type,
         uploaded_by: user.id,
+        extracted_text: extractedText,
         updated_at: new Date().toISOString(),
       };
 
       const { data, error: saveError } = await supabase
         .from('business_cases')
-        .upsert(record, { onConflict: 'channel_id' })
+        .upsert(record, { onConflict: 'channel_id,document_type' })
         .select()
         .single();
 
@@ -105,8 +142,8 @@ export default function BusinessCase({ channelId }) {
 
       setBusinessCase(data);
     } catch (error) {
-      console.error('Error adjuntando Business Case:', error);
-      alert('No se pudo adjuntar el Business Case: ' + error.message);
+      console.error(`Error adjuntando ${config.title}:`, error);
+      alert(`No se pudo adjuntar el ${config.title}: ${error.message}`);
     } finally {
       setUploading(false);
       event.target.value = '';
@@ -119,7 +156,7 @@ export default function BusinessCase({ channelId }) {
       type="file"
       onChange={handleUpload}
       className="hidden"
-      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+      accept={config.accept}
     />
   );
 
@@ -136,12 +173,12 @@ export default function BusinessCase({ channelId }) {
       <div className="bg-white border border-surface-3 rounded-xl p-3.5">
         <div className="flex flex-col items-center gap-3 sm:flex-row sm:text-left">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-surface-1">
-            <FileText size={19} className="text-text-muted" />
+            <DocumentIcon size={19} className="text-text-muted" />
           </div>
           <div className="min-w-0 flex-1 text-center sm:text-left">
-            <p className="text-sm font-semibold text-text-secondary">Business Case no adjuntado</p>
+            <p className="text-sm font-semibold text-text-secondary">{config.missingTitle}</p>
             <p className="mt-0.5 text-xs text-text-muted">
-              Adjunta el Business Case para centralizar la información económica y comercial del canal.
+              {config.description}
             </p>
           </div>
           <button
@@ -153,7 +190,7 @@ export default function BusinessCase({ channelId }) {
             {uploading ? (
               <><Loader2 size={14} className="animate-spin" /> Adjuntando...</>
             ) : (
-              <><Upload size={14} /> Adjuntar Business Case</>
+              <><Upload size={14} /> {config.uploadLabel}</>
             )}
           </button>
           {fileInput}
@@ -167,14 +204,15 @@ export default function BusinessCase({ channelId }) {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center flex-shrink-0">
-            <FileText size={19} className="text-brand-500" />
+            <DocumentIcon size={19} className="text-brand-500" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-text-primary">Business Case</p>
+            <p className="text-sm font-bold text-text-primary">{config.title}</p>
             <p className="text-xs text-text-secondary truncate">{businessCase.file_name}</p>
             <p className="text-[10px] text-text-muted">
               {formatFileSize(businessCase.file_size)}
               {businessCase.updated_at && ` · Actualizado ${new Date(businessCase.updated_at).toLocaleDateString('es-ES')}`}
+              {documentType === 'hunter_canvas' && businessCase.extracted_text && ' · Disponible para la IA'}
             </p>
           </div>
         </div>

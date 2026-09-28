@@ -7,6 +7,7 @@ const TYPE_LABELS = {
 };
 
 const CAES_LABELS = {
+  caes_platform: { mascara: 'Máscara', natureco: 'Natureco', smartfy: 'Smartfy' },
   caes_role: {
     promoter: 'Promotor', promoter_ot: 'Promotor + OT',
     promoter_ot_verifier: 'Promotor + OT + Verificador',
@@ -117,6 +118,7 @@ export async function loadChannelAiContext(channel, client = supabase) {
   const caesContext = caes ? `
 
 DATOS ESPECÍFICOS CAES
+Plataforma: ${caesValue('caes_platform', channel.caes_platform)}
 Rol: ${caesValue('caes_role', channel.caes_role)}
 Modelo de contrato: ${caesValue('caes_contract_model', channel.caes_contract_model)}
 Tramo retributivo: ${caesValue('caes_remuneration_tier', channel.caes_remuneration_tier)}

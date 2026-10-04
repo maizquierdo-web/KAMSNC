@@ -22,6 +22,19 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function sourceLabel(source) {
+  if (!source) return 'Origen no disponible';
+  if (source.source_type === 'manual') {
+    return `Aportación directa del KAM${source.kamName ? ` · ${source.kamName}` : ''}`;
+  }
+  const origin = {
+    conversation: 'Ficha de canal',
+    meeting_minutes: 'Acta de reunión',
+    document: 'Documento',
+  }[source.source_type] || 'Información de canal';
+  return `${origin} · ${source.channelName || 'Canal de origen no disponible'}`;
+}
+
 export default function BenchmarkPanel({ open, onClose }) {
   const { profile } = useAuthContext();
   const [mode, setMode] = useState('analyze');
@@ -45,12 +58,30 @@ export default function BenchmarkPanel({ open, onClose }) {
     try {
       const { data, error: queryError } = await supabase
         .from('benchmark_entries')
-        .select('id, source_id, competitor_id, domain, subdomain, section, statement, entry_type, reliability, confidence, implication, recommended_action, tags, valid_until, created_at, updated_at, benchmark_competitors(name), benchmark_sources(id, source_type, title, source_date, channel_id, created_at)')
+        .select('id, source_id, competitor_id, domain, subdomain, section, statement, entry_type, reliability, confidence, implication, recommended_action, tags, valid_until, created_at, updated_at, benchmark_competitors(name), benchmark_sources(id, source_type, title, source_date, channel_id, created_by, created_at)')
         .eq('status', 'incorporated')
         .order('created_at', { ascending: false })
         .limit(500);
       if (queryError) throw queryError;
-      setEntries(data || []);
+      const rows = data || [];
+      const channelIds = [...new Set(rows.map(row => row.benchmark_sources?.channel_id).filter(Boolean))];
+      const kamIds = [...new Set(rows.filter(row => row.benchmark_sources?.source_type === 'manual').map(row => row.benchmark_sources?.created_by).filter(Boolean))];
+      // Resolve names under the current user's RLS permissions. Missing names
+      // must not prevent the collective memory from loading.
+      const names = await Promise.allSettled([
+        channelIds.length ? supabase.from('channels').select('id, name').in('id', channelIds) : Promise.resolve({ data: [] }),
+        kamIds.length ? supabase.from('profiles').select('id, full_name').in('id', kamIds) : Promise.resolve({ data: [] }),
+      ]);
+      const channelNames = new Map((names[0].status === 'fulfilled' ? names[0].value.data || [] : []).map(row => [row.id, row.name]));
+      const kamNames = new Map((names[1].status === 'fulfilled' ? names[1].value.data || [] : []).map(row => [row.id, row.full_name]));
+      setEntries(rows.map(row => ({
+        ...row,
+        benchmark_sources: row.benchmark_sources ? {
+          ...row.benchmark_sources,
+          channelName: channelNames.get(row.benchmark_sources.channel_id),
+          kamName: kamNames.get(row.benchmark_sources.created_by),
+        } : null,
+      })));
     } catch (queryError) {
       console.error('Error cargando Benchmark:', queryError);
       setError('No se pudo cargar la memoria de Benchmark. Comprueba que la migración esté aplicada.');
@@ -188,7 +219,10 @@ export default function BenchmarkPanel({ open, onClose }) {
                       </div>
                       {entry.benchmark_competitors?.name && <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">{entry.benchmark_competitors.name}</p>}
                       <p className="text-xs leading-relaxed text-slate-700">{entry.statement}</p>
-                      <div className="mt-2 text-[9px] text-slate-400">{SECTION_LABELS[entry.section]} · Información de mercado</div>
+                      <div className="mt-2 space-y-0.5 text-[10px] leading-relaxed text-slate-500">
+                        <p>{SECTION_LABELS[entry.section]} · Información de mercado</p>
+                        <p className="break-words">Origen: {sourceLabel(entry.benchmark_sources)}</p>
+                      </div>
                     </article>
                   ))}
                 </div>

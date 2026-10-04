@@ -25,7 +25,7 @@ function formatDate(value) {
 function sourceLabel(source) {
   if (!source) return 'Origen no disponible';
   if (source.source_type === 'manual') {
-    return `Aportación directa del KAM${source.kamName ? ` · ${source.kamName}` : ''}`;
+    return 'Aportación directa del KAM';
   }
   const origin = {
     conversation: 'Ficha de canal',
@@ -65,21 +65,17 @@ export default function BenchmarkPanel({ open, onClose }) {
       if (queryError) throw queryError;
       const rows = data || [];
       const channelIds = [...new Set(rows.map(row => row.benchmark_sources?.channel_id).filter(Boolean))];
-      const kamIds = [...new Set(rows.filter(row => row.benchmark_sources?.source_type === 'manual').map(row => row.benchmark_sources?.created_by).filter(Boolean))];
       // Resolve names under the current user's RLS permissions. Missing names
       // must not prevent the collective memory from loading.
       const names = await Promise.allSettled([
         channelIds.length ? supabase.from('channels').select('id, name').in('id', channelIds) : Promise.resolve({ data: [] }),
-        kamIds.length ? supabase.from('profiles').select('id, full_name').in('id', kamIds) : Promise.resolve({ data: [] }),
       ]);
       const channelNames = new Map((names[0].status === 'fulfilled' ? names[0].value.data || [] : []).map(row => [row.id, row.name]));
-      const kamNames = new Map((names[1].status === 'fulfilled' ? names[1].value.data || [] : []).map(row => [row.id, row.full_name]));
       setEntries(rows.map(row => ({
         ...row,
         benchmark_sources: row.benchmark_sources ? {
           ...row.benchmark_sources,
           channelName: channelNames.get(row.benchmark_sources.channel_id),
-          kamName: kamNames.get(row.benchmark_sources.created_by),
         } : null,
       })));
     } catch (queryError) {

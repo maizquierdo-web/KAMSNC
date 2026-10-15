@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
-import { ACTIVITY_VISUAL } from '../lib/crmConstants';
 import {
   Loader2, Plus, ChevronLeft, ChevronRight, ChevronDown, X, Check,
   Clock, MapPin, Building2, CalendarDays, Mail, Phone,
@@ -64,14 +63,14 @@ function getSummaryPeriodRange(period, weekStart, customFrom, customTo) {
 const DAY_NAMES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
 const TYPE_CONFIG = {
-  visit: { label: 'Visita', icon: MapPin, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  call: { label: 'Llamada', icon: Phone, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  email: { label: 'Email', icon: Mail, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  meeting: { label: 'Reunión', icon: Users, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  linkedin: { label: 'LinkedIn', icon: Linkedin, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  follow_up: { label: 'Seguimiento', icon: Clock, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
-  other: { label: 'Otro', icon: Calendar, color: ACTIVITY_VISUAL.color, bg: ACTIVITY_VISUAL.bg, borderColor: ACTIVITY_VISUAL.border },
+  visit: { label: 'Visita', icon: MapPin, color: '#E87A1E', bg: '#FEF3E8', borderColor: '#E87A1E' },
+  call: { label: 'Llamada', icon: Phone, color: '#3b82f6', bg: '#eff6ff', borderColor: '#3b82f6' },
+  email: { label: 'Email', icon: Mail, color: '#8b5cf6', bg: '#f3eeff', borderColor: '#8b5cf6' },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle, color: '#16a34a', bg: '#e6f5ed', borderColor: '#16a34a' },
+  meeting: { label: 'Reunión', icon: Users, color: '#E87A1E', bg: '#FEF3E8', borderColor: '#E87A1E' },
+  linkedin: { label: 'LinkedIn', icon: Linkedin, color: '#0077b5', bg: '#e8f4fd', borderColor: '#0077b5' },
+  follow_up: { label: 'Seguimiento', icon: Clock, color: '#0f766e', bg: '#ecfdf5', borderColor: '#0f766e' },
+  other: { label: 'Otro', icon: Calendar, color: '#5a6078', bg: '#f0f0f4', borderColor: '#5a6078' },
 };
 
 const ACTION_TYPES = [

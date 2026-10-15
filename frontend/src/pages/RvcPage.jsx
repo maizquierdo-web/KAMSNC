@@ -1,22 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
-import { VOLUME_UNITS, formatVolume } from '../components/VolumeEditor';
+import { VOLUME_UNITS } from '../components/VolumeEditor';
+import { semesterRange, fetchAllRows, calculateRvc, visitDecision } from '../lib/rvc.mjs';
 import { Loader2, TrendingUp, Target, Building2, Zap, MapPin, Sun, ChevronLeft, ChevronRight } from 'lucide-react';
-
-function getSemesterRange(offset = 0) {
-  const now = new Date();
-  const currentIndex = now.getFullYear() * 2 + (now.getMonth() >= 6 ? 1 : 0);
-  const targetIndex = currentIndex + offset;
-  const year = Math.floor(targetIndex / 2);
-  const half = targetIndex % 2;
-  const startMonth = half * 6;
-  return {
-    from: new Date(year, startMonth, 1, 0, 0, 0, 0),
-    to: new Date(year, startMonth + 6, 0, 23, 59, 59, 999),
-    label: `${half === 0 ? '1º' : '2º'} semestre ${year}`,
-  };
-}
 
 const EXCLUDED_RVC_USERS = new Set([
   'jf nieto',
@@ -34,13 +22,17 @@ function normalizeUserName(name = '') {
 export default function RvcPage() {
   const { user, profile, isManager } = useAuthContext();
   const [semesterOffset, setSemesterOffset] = useState(0);
-  const range = getSemesterRange(semesterOffset);
+  const range = semesterRange(semesterOffset);
   const [selectedUser, setSelectedUser] = useState('all');
   const [availableUsers, setAvailableUsers] = useState([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [channels, setChannels] = useState([]);
   const [allActiveChannels, setAllActiveChannels] = useState([]);
   const [visits, setVisits] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [error, setError] = useState('');
+  const [usersError, setUsersError] = useState('');
+  const requestId = useRef(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,89 +41,92 @@ export default function RvcPage() {
 
   useEffect(() => {
     if (user && isManager) loadAvailableUsers();
+    return () => { requestId.current += 1; };
   }, [user, isManager]);
 
   async function loadAvailableUsers() {
-    const { data } = await supabase.from('profiles').select('id, full_name, role')
-      .eq('is_active', true).in('role', ['kam', 'coordinator', 'manager', 'director']).order('full_name');
-    setAvailableUsers((data || []).filter(item => !EXCLUDED_RVC_USERS.has(normalizeUserName(item.full_name))));
-    setUsersLoaded(true);
+    setUsersLoaded(false);
+    setUsersError('');
+    try {
+      const data = await fetchAllRows(() => supabase.from('profiles').select('id, full_name, role')
+        .eq('is_active', true).in('role', ['kam', 'coordinator', 'manager', 'director']));
+      setAvailableUsers(data.filter(item => !EXCLUDED_RVC_USERS.has(normalizeUserName(item.full_name)))
+        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'es')));
+      setUsersLoaded(true);
+    } catch (err) {
+      setUsersError('No se pudo cargar la lista de gestores. Reintenta la consulta.');
+      setLoading(false);
+    }
   }
 
   async function loadData() {
+    const request = ++requestId.current;
     setLoading(true);
+    setError('');
     try {
       const fromISO = range.from.toISOString();
-      const toISO = range.to.toISOString();
+      const untilISO = range.until.toISOString();
+      const ids = isManager ? (selectedUser === 'all' ? availableUsers.map(item => item.id) : [selectedUser]) : [user.id];
+      if (!ids.length) {
+        setChannels([]); setAllActiveChannels([]); setVisits([]); setHistory([]);
+        return;
+      }
+      const scope = (query, key) => query.in(key, ids);
 
       // 1. Canales creados en el periodo (para KPIs 1, 2, 3)
-      let chQuery = supabase
+      const channelsQuery = () => scope(supabase
         .from('channels')
-        .select('id, status, volume_amount, volume_unit, lead_source, created_at')
+        .select('id, assigned_to, status, volume_amount, volume_unit, lead_source, created_at')
         .gte('created_at', fromISO)
-        .lte('created_at', toISO);
-      if (!isManager) chQuery = chQuery.eq('assigned_to', user.id);
-      else if (selectedUser !== 'all') chQuery = chQuery.eq('assigned_to', selectedUser);
-      else if (availableUsers.length > 0) chQuery = chQuery.in('assigned_to', availableUsers.map(item => item.id));
-      const { data: chData } = await chQuery;
-      setChannels(chData || []);
+        .lt('created_at', untilISO), 'assigned_to');
 
       // 2. TODOS los canales activos (para KPI 4, sin filtro de periodo)
-      let activeQuery = supabase
+      const activeQuery = () => scope(supabase
         .from('channels')
-        .select('id, volume_amount, volume_unit')
-        .eq('status', 'activo');
-      if (!isManager) activeQuery = activeQuery.eq('assigned_to', user.id);
-      else if (selectedUser !== 'all') activeQuery = activeQuery.eq('assigned_to', selectedUser);
-      else if (availableUsers.length > 0) activeQuery = activeQuery.in('assigned_to', availableUsers.map(item => item.id));
-      const { data: activeData } = await activeQuery;
-      setAllActiveChannels(activeData || []);
+        .select('id, assigned_to, volume_amount, volume_unit')
+        .eq('status', 'activo'), 'assigned_to');
 
       // 3. Visitas en el periodo (para KPI 5)
-      let vQuery = supabase
+      const visitsQuery = () => scope(supabase
         .from('visits')
-        .select('id, checkin_at')
+        .select('id, channel_id, kam_id, checkin_at, checkin_lat, checkin_lng, is_gps_verified, channel_status_at_checkin, channels(name)')
         .gte('checkin_at', fromISO)
-        .lte('checkin_at', toISO);
-      if (!isManager) vQuery = vQuery.eq('kam_id', user.id);
-      else if (selectedUser !== 'all') vQuery = vQuery.eq('kam_id', selectedUser);
-      else if (availableUsers.length > 0) vQuery = vQuery.in('kam_id', availableUsers.map(item => item.id));
-      const { data: vData } = await vQuery;
-      setVisits(vData || []);
+        .lt('checkin_at', untilISO), 'kam_id');
+      const [chData, activeData, vData] = await Promise.all([
+        fetchAllRows(channelsQuery), fetchAllRows(activeQuery), fetchAllRows(visitsQuery),
+      ]);
+      const channelIds = [...new Set(vData.filter(v => !v.channel_status_at_checkin && v.is_gps_verified).map(v => v.channel_id))];
+      const allHistory = [];
+      for (let start = 0; start < channelIds.length; start += 100) {
+        allHistory.push(...await fetchAllRows(() => supabase.from('channel_pipeline_history')
+          .select('id, channel_id, from_stage, to_stage, created_at').in('channel_id', channelIds.slice(start, start + 100))));
+      }
+      if (request !== requestId.current) return;
+      setChannels(chData); setAllActiveChannels(activeData); setVisits(vData); setHistory(allHistory);
     } catch (err) {
       console.error('Error cargando datos RVC:', err);
+      if (request === requestId.current) setError('No se pudo calcular el RVC completo. Reintenta; si falta channel_status_at_checkin, debe aplicarse la migración del RVC.');
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
   }
 
   // ─── Cálculos de KPIs ──────────────────────────────────────────────────────
 
-  // Lead sources de tipo PUSH (los KPIs 1 y 2 solo cuentan estos)
-  const PUSH_SOURCES = ['evento', 'congreso', 'webinar', 'linkedin_sales_navigator', 'asociacion_sectorial', 'paginas_empleo'];
-  const isPush = (ch) => Array.isArray(ch.lead_source) && ch.lead_source.some(s => PUSH_SOURCES.includes(s));
-
-  // KPI 1: Nº de leads proactivos identificados (solo canales PUSH creados en el periodo)
-  const pushChannels = channels.filter(isPush);
-  const leadsCount = pushChannels.length;
-
-  // KPI 2: Tasa de éxito (canales PUSH activos / total canales PUSH creados en el periodo)
-  const activeInPeriod = pushChannels.filter(c => c.status === 'activo').length;
-  const successRate = leadsCount > 0 ? ((activeInPeriod / leadsCount) * 100).toFixed(1) : '0.0';
-
-  // KPI 3: Captación nuevas EECC (canales creados en el periodo con status activo)
-  const newActiveCount = activeInPeriod;
+  const metrics = calculateRvc(channels, allActiveChannels, visits, history);
+  const leadsCount = metrics.leads;
+  const activeInPeriod = metrics.converted;
+  const successRate = metrics.successRate;
+  const newActiveCount = metrics.converted;
 
   // KPI 4: Volúmenes por tipo (de TODOS los canales activos, sin filtro de periodo)
   const volumeByType = VOLUME_UNITS.map(vu => ({
     ...vu,
-    total: allActiveChannels
-      .filter(c => c.volume_unit === vu.key)
-      .reduce((sum, c) => sum + (parseFloat(c.volume_amount) || 0), 0),
+    total: metrics.volumes[vu.key] || 0,
   }));
 
   // KPI 5: Número de visitas en el periodo
-  const visitsCount = visits.length;
+  const visitsCount = metrics.visits;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -161,7 +156,7 @@ export default function RvcPage() {
       bg: 'rgba(139,92,246,0.1)',
     },
     {
-      label: 'Visitas realizadas',
+      label: 'Visitas geolocalizadas a potenciales',
       value: visitsCount,
       unit: 'visitas',
       icon: MapPin,
@@ -186,7 +181,7 @@ export default function RvcPage() {
             <div className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Periodo de cálculo</div>
             <div className="text-sm font-bold text-text-primary mt-0.5">{range.label}</div>
             <div className="text-[10px] text-text-secondary mt-0.5">
-              {range.from.toLocaleDateString('es-ES')} — {range.to.toLocaleDateString('es-ES')}
+              {range.from.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })} — {range.to.toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -221,12 +216,36 @@ export default function RvcPage() {
       </div>
 
       {/* KPI Cards */}
-      {loading ? (
+      {error || usersError ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {usersError || error}
+          <button onClick={() => usersError ? loadAvailableUsers() : loadData()} className="ml-3 font-bold underline">Reintentar</button>
+        </div>
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 size={24} className="animate-spin text-brand-400" />
         </div>
       ) : (
         <>
+        <p className="mb-3 text-xs text-text-secondary">Canales y volumen: responsable actual. Visitas: gestor que hizo el check-in, aunque el cierre sea administrativo. La captación incluye solo leads PUSH creados en el semestre.</p>
+        {(metrics.pending > 0 || metrics.inferred > 0) && (
+          <div role="status" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            Recuento de visitas provisional: {metrics.inferred} con estado reconstruido del historial y {metrics.pending} sin estado histórico verificable (no incluidas). Requieren revisión antes de validar el RVC.
+          </div>
+        )}
+        {(metrics.pending > 0 || metrics.inferred > 0) && (
+          <details className="mb-4 rounded-xl border border-surface-3 bg-surface-1 p-3 text-xs">
+            <summary className="cursor-pointer font-semibold">Revisar visitas históricas</summary>
+            <ul className="mt-3 space-y-2">{visits.map(visit => ({ visit, decision: visitDecision(visit, history) }))
+              .filter(({ decision }) => decision === 'unknown' || decision.startsWith('inferred_'))
+              .map(({ visit, decision }) => <li key={visit.id}>
+                <Link to={`/channels?detail=${visit.channel_id}`} className="font-semibold underline">{visit.channels?.name || 'Abrir canal'}</Link>
+                {' · '}{availableUsers.find(p => p.id === visit.kam_id)?.full_name || profile?.full_name || 'Gestor'}
+                {' · '}{new Date(visit.checkin_at).toLocaleString('es-ES', { timeZone: 'Europe/Madrid' })}
+                {' · '}{decision === 'unknown' ? 'Sin estado histórico: no incluida' : decision === 'inferred_eligible' ? 'Incluida según historial; pendiente de validar' : 'Excluida según historial; pendiente de validar'}
+              </li>)}</ul>
+          </details>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.map((kpi, i) => {
             const Icon = kpi.icon;
@@ -244,6 +263,19 @@ export default function RvcPage() {
             );
           })}
         </div>
+
+        {isManager && selectedUser === 'all' && (
+          <div className="mt-5 overflow-x-auto rounded-xl border border-surface-3 bg-surface-1">
+            <table className="w-full text-left text-xs">
+              <caption className="p-3 text-left font-bold">Desglose por gestor · volumen total activo</caption>
+              <thead><tr className="border-b border-surface-3"><th className="p-3">Gestor</th><th className="p-3">Leads PUSH</th><th className="p-3">Éxito</th><th className="p-3">Captación</th><th className="p-3">Visitas</th><th className="p-3">Pendientes de revisar</th>{VOLUME_UNITS.map(v => <th key={v.key} className="p-3">{v.label} ({v.unit})</th>)}</tr></thead>
+              <tbody>{availableUsers.map(manager => {
+                const row = calculateRvc(channels, allActiveChannels, visits, history, manager.id);
+                return <tr key={manager.id} className="border-b border-surface-3"><td className="p-3 font-semibold">{manager.full_name}</td><td className="p-3">{row.leads}</td><td className="p-3">{row.successRate}%</td><td className="p-3">{row.converted}</td><td className="p-3">{row.visits}</td><td className="p-3">{row.pending + row.inferred}</td>{VOLUME_UNITS.map(v => <td key={v.key} className="p-3">{(row.volumes[v.key] || 0).toFixed(1)}</td>)}</tr>;
+              })}</tbody>
+            </table>
+          </div>
+        )}
 
         {/* Volumen negociado desglosado por tipo (total canales activos, sin filtro de periodo) */}
         <div className="mt-5">

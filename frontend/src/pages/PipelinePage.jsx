@@ -5,7 +5,7 @@ import { useAuthContext } from '../components/AuthProvider';
 import { useChannelTypes } from '../hooks/useChannelTypes';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
 import {
-  PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, stageToStatus,
+  PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, stageToStatus, LEAD_SOURCE_OPTIONS,
 } from '../lib/crmConstants';
 import {
   Loader2, ChevronRight, ChevronDown, X, Check, Filter,
@@ -83,6 +83,27 @@ async function getChannelLastActivity(channelId) {
 }
 
 // ============ CHANNEL CARD ============
+function leadOriginGroups(sources) {
+  return ['push', 'pull'].filter(group => LEAD_SOURCE_OPTIONS.some(option =>
+    option.group === group && Array.isArray(sources) && sources.includes(option.value)
+  ));
+}
+
+function LeadOriginBadge({ sources }) {
+  const selected = LEAD_SOURCE_OPTIONS.filter(option => Array.isArray(sources) && sources.includes(option.value));
+  const groups = leadOriginGroups(sources);
+  const title = selected.length ? selected.map(option => option.label).join(', ') : 'El canal no tiene un origen de lead informado';
+  return (
+    <div className="mb-1 mt-1 flex flex-wrap gap-1" title={title} aria-label={`Origen del lead: ${groups.length ? groups.join(' y ').toUpperCase() : 'sin definir'}`}>
+      {groups.length ? groups.map(group => (
+        <span key={group} className={`rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${group === 'push' ? 'bg-blue-50 text-blue-700' : 'bg-teal-50 text-teal-700'}`}>
+          {group.toUpperCase()}
+        </span>
+      )) : <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">Origen sin definir</span>}
+    </div>
+  );
+}
+
 function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, dateType, classifications }) {
   const daysInStage = daysSince(channel.pipeline_stage_changed_at || channel.updated_at);
   const lastVisitDays = channel.last_visit_at ? daysSince(channel.last_visit_at) : null;
@@ -104,6 +125,8 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
         </div>
         <ChevronRight size={11} className="text-[#c5cbd6] group-hover:text-[#E87A1E] transition-colors flex-shrink-0 mt-0.5" />
       </div>
+
+      <LeadOriginBadge sources={channel.lead_source} />
 
       {showKam && channel.profiles?.full_name && (
         <div className="text-[10px] text-[#E87A1E] font-medium mb-1">{channel.profiles.full_name}</div>
@@ -247,6 +270,7 @@ function PipelineMobile({ channelsByStage, onMove, loading, onChannelClick, type
                   <div key={ch.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-[#ffffff] border" style={{ borderColor: stage.border }}>
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onChannelClick(ch.id)}>
                       <div className="text-sm font-semibold truncate hover:text-[#E87A1E] transition-colors">{ch.name}</div>
+                      <LeadOriginBadge sources={ch.lead_source} />
                       <div className="text-[10px] text-[#8b90a0]">
                         {showKam && ch.profiles?.full_name ? `${ch.profiles.full_name} · ` : ''}
                         {dateType === 'creation' ? `Creado: ${formatShortDate(ch.created_at)}` : `Actividad: ${formatShortDate(ch.last_activity_at || ch.pipeline_stage_changed_at || ch.updated_at)}`}
@@ -364,6 +388,7 @@ export default function PipelinePage() {
   const [period, setPeriod] = useState(() => searchParams.get('period') || 'all');
   const [dateType, setDateType] = useState(() => searchParams.get('dateType') || 'creation');
   const [selectedKam, setSelectedKam] = useState(() => searchParams.get('kam') || 'all');
+  const [leadOrigin, setLeadOrigin] = useState(() => ['push', 'pull'].includes(searchParams.get('origin')) ? searchParams.get('origin') : 'all');
   const [customFrom, setCustomFrom] = useState(() => searchParams.get('from') || '');
   const [customTo, setCustomTo] = useState(() => searchParams.get('to') || '');
 
@@ -379,12 +404,13 @@ export default function PipelinePage() {
   useEffect(() => {
     const params = new URLSearchParams();
     if (selectedKam !== 'all') params.set('kam', selectedKam);
+    if (leadOrigin !== 'all') params.set('origin', leadOrigin);
     if (period !== 'all') params.set('period', period);
     if (dateType !== 'creation') params.set('dateType', dateType);
     if (period === 'custom' && customFrom) params.set('from', customFrom);
     if (period === 'custom' && customTo) params.set('to', customTo);
     setSearchParams(params, { replace: true });
-  }, [selectedKam, period, dateType, customFrom, customTo, setSearchParams]);
+  }, [selectedKam, leadOrigin, period, dateType, customFrom, customTo, setSearchParams]);
 
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
   useEffect(() => {
@@ -607,6 +633,7 @@ export default function PipelinePage() {
   function handleChannelClick(channelId) {
     const pipelineParams = new URLSearchParams();
     if (selectedKam !== 'all') pipelineParams.set('kam', selectedKam);
+    if (leadOrigin !== 'all') pipelineParams.set('origin', leadOrigin);
     if (period !== 'all') pipelineParams.set('period', period);
     if (dateType !== 'creation') pipelineParams.set('dateType', dateType);
     if (period === 'custom' && customFrom) pipelineParams.set('from', customFrom);
@@ -618,6 +645,7 @@ export default function PipelinePage() {
 
   const filteredChannels = channels.filter(ch => {
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;
+    if (leadOrigin !== 'all' && !leadOriginGroups(ch.lead_source).includes(leadOrigin)) return false;
     if (period === 'all') return true;
     if (dateType === 'activity_change') {
   return activityChannelIds.has(ch.id);
@@ -694,6 +722,18 @@ export default function PipelinePage() {
       {isManager && teamKams.length > 0 && (
         <KamSelector kams={teamKams} selected={selectedKam} onChange={setSelectedKam} />
       )}
+
+      <div className="mb-3 flex items-center gap-2">
+        <span className="text-xs font-semibold text-[#5a6078]">Origen</span>
+        <div role="group" aria-label="Filtrar por origen del lead" className="inline-flex rounded-lg border border-[#dde1e8] bg-[#f7f8fa] p-1">
+          {[{ key: 'all', label: 'TODOS' }, { key: 'push', label: 'PUSH' }, { key: 'pull', label: 'PULL' }].map(option => (
+            <button key={option.key} type="button" aria-pressed={leadOrigin === option.key} onClick={() => setLeadOrigin(option.key)}
+              className={`rounded-md px-3 py-2 text-xs font-bold transition-colors ${leadOrigin === option.key ? 'bg-white text-[#003E6B] shadow-sm' : 'text-[#5a6078] hover:bg-white/60'}`}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide mb-3">
         {[

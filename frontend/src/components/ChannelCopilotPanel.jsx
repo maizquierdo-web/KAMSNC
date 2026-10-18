@@ -8,7 +8,7 @@ import { useAuthContext } from './AuthProvider';
 import { loadChannelAiContext } from '../lib/channelAiContext';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
+const DESKTOP_PANEL_QUERY = '(min-width: 1024px)';
 
 const SUGGESTIONS = [
   '¿Qué debo hacer ahora?',

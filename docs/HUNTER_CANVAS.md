@@ -1,6 +1,8 @@
 # Hunter Canvas en la ficha de canal
 
-El panel existente evoluciona a Hunter Canvas. Conserva la memoria por canal, el endpoint /api/assistant y la detección de Benchmark sobre aportaciones del KAM, nunca sobre las respuestas generadas.
+Hay dos accesos diferenciados. El botón superior «Explícame esta cuenta» conserva el componente, prompt, sugerencias, memoria y Benchmark originales. La sección inferior Hunter Canvas abre un agente específico para trabajar por bloques y generar documentos. Ambos reutilizan /api/assistant y el contexto autorizado del canal.
+
+Hunter Canvas guarda las aportaciones del KAM en la memoria común de la cuenta, pero no mezcla sus respuestas de IA con el historial del copiloto original. Su diálogo guiado y borradores son temporales; el documento guardado conserva el resultado. Benchmark solo analiza aportaciones del KAM y siempre solicita confirmación.
 
 El prompt adapta Superprompt Agente Hunter Canvas v3 aportado por el usuario. Conserva los ocho bloques y el razonamiento de sinergia. Se ajusta para leer el contexto autorizado del CRM, retomar cuentas existentes, permitir accesos directos, reducir el brainstorming por defecto y distinguir Documentado, Aportado por el KAM, Hipótesis y GAP. Se eliminan garantías comerciales implícitas: ni recurrencia ni rentabilidades, plazos o porcentajes se presuponen.
 

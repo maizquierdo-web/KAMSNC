@@ -13,6 +13,7 @@ import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
 import ChannelCaesActiveDetails from '../components/ChannelCaesActiveDetails';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
+import HunterCanvasPanel from '../components/HunterCanvasPanel';
 import NextBestActionCard from '../components/NextBestActionCard';
 import MeetingMinutes from '../components/MeetingMinutes';
 import VolumeEditor from '../components/VolumeEditor';
@@ -260,6 +261,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const [editError, setEditError] = useState('');
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [hunterOpen, setHunterOpen] = useState(false);
 
   useEffect(() => {
     loadChannel();
@@ -481,7 +483,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
     || Boolean(channel.potencial_caes);
 
   return (
-    <div className={`grid items-start gap-4 ${copilotOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'}`}>
+    <div className={`grid items-start gap-4 ${copilotOpen || hunterOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'}`}>
       <div className="min-w-0">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-brand-400 font-semibold mb-4">
         ← Canales
@@ -664,9 +666,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   )}
                 </div>
               </div>
-              <button type="button" onClick={() => setCopilotOpen(true)}
+              <button type="button" disabled={hunterOpen} onClick={() => setCopilotOpen(true)}
                 className="col-span-2 col-start-2 row-start-2 flex w-fit max-w-full flex-shrink-0 items-center gap-1 rounded-lg border border-navy-100 bg-navy-50 px-2 py-1.5 text-[10px] font-bold leading-none text-navy-700 transition-colors hover:border-navy-200 hover:bg-navy-100 sm:ml-auto sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs [&>svg]:text-navy-500">
-                <Sparkles className="h-3 w-3 flex-shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="truncate">Hunter Canvas</span>
+                <Sparkles className="h-3 w-3 flex-shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="truncate">Explícame esta cuenta</span>
               </button>
               <button type="button" onClick={startEdit} aria-label="Editar canal"
                 className="col-start-3 row-start-1 flex-shrink-0 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary sm:p-2">
@@ -826,9 +828,20 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <BusinessCase channelId={channelId} />
       </div>
 
-      {hunterManualAccessEnabled(import.meta.env.VITE_HUNTER_CANVAS_LAUNCHED_AT) && <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
-        <BusinessCase channelId={channelId} documentType="hunter_canvas" />
-      </div>}
+      <section id="channel-hunter-canvas" className="mb-3 scroll-mt-20 rounded-xl border border-surface-3 bg-white p-3.5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-text-primary">Hunter Canvas</h2>
+            <p className="mt-1 text-xs text-text-secondary">Construye tu plan de cuenta por bloques y genera el documento.</p>
+          </div>
+          <button type="button" disabled={copilotOpen} onClick={() => setHunterOpen(true)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-navy-100 bg-navy-50 px-3 py-2 text-xs font-bold text-navy-700 hover:bg-navy-100 disabled:opacity-40">
+            <Sparkles size={14} /> Trabajar Hunter Canvas
+          </button>
+        </div>
+        {hunterManualAccessEnabled(import.meta.env.VITE_HUNTER_CANVAS_LAUNCHED_AT) && <div className="mt-3">
+          <BusinessCase channelId={channelId} documentType="hunter_canvas" />
+        </div>}
+      </section>
 
       <div className="mb-3">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
@@ -839,7 +852,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       </div>
       </div>
 
-      <ChannelCopilotPanel key={channel.id} open={copilotOpen} onClose={() => setCopilotOpen(false)} channel={channel} />
+      {copilotOpen && <ChannelCopilotPanel key={channel.id} open onClose={() => setCopilotOpen(false)} channel={channel} />}
+      {hunterOpen && <HunterCanvasPanel key={channel.id} open onClose={() => setHunterOpen(false)} channel={channel} />}
     </div>
   );
 }

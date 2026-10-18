@@ -77,6 +77,13 @@ export async function loadChannelAiContext(channel, client = supabase) {
     client.from('benchmark_sources').select('id, title, source_date').eq('channel_id', channel.id).order('source_date', { ascending: false }).limit(10),
   ]);
 
+  const warnings = [
+    ['classification', classRes], ['interacciones', interactionsRes], ['visitas', visitsRes],
+    ['visitas planificadas', plannedVisitsRes], ['notas', notesRes], ['actas', meetingsRes],
+    ['historial', historyRes], ['documentos comerciales', commercialDocumentsRes],
+    ['responsable', profileRes], ['memoria', memoryRes], ['fuentes Benchmark', benchmarkSourcesRes],
+  ].filter(([, result]) => result?.error).map(([name]) => `No se pudo consultar ${name}`);
+
   const classifications = resultData(classRes).map(item => {
     const classification = item.channel_classification;
     return [classification?.canal, classification?.subcanal, classification?.tipo, item.custom_text]
@@ -94,9 +101,11 @@ export async function loadChannelAiContext(channel, client = supabase) {
         fileName: meeting.file_name,
         fileSize: meeting.file_size,
       });
+      if (!extracted.text?.trim()) warnings.push(`Acta sin texto legible: ${meeting.file_name}`);
       return { ...meeting, documentText: extracted.text || '' };
     } catch (error) {
       console.warn(`No se pudo leer el acta ${meeting.file_name}:`, error);
+      warnings.push(`No se pudo leer el acta ${meeting.file_name}`);
       return meeting;
     }
   }));
@@ -121,6 +130,7 @@ export async function loadChannelAiContext(channel, client = supabase) {
       .order('created_at', { ascending: false }).limit(12)
     : { data: [], error: null };
   const benchmarkEntries = resultData(benchmarkEntriesRes);
+  if (benchmarkEntriesRes.error) warnings.push('No se pudo consultar el contenido de Benchmark');
   const sourceMap = new Map(benchmarkSources.map(source => [source.id, source]));
 
   const completedInteractions = interactions.filter(item => item.is_completed === true || (item.is_completed !== false && !item.planned_date));
@@ -139,7 +149,11 @@ Verificador: ${caesValue('caes_verifier', channel.caes_verifier)}
 Número de pedido: ${valueOrDash(channel.caes_order_number)}
 Estado del alta: ${valueOrDash(channel.onboarding_status)}` : '';
 
-  const context = `FECHA ACTUAL
+  const context = `ALCANCE DE LECTURA
+Ventana reciente, no todo el expediente: hasta 20 interacciones, 10 visitas, 10 visitas pendientes, 10 notas, 15 actas, 10 cambios de fase y 40 mensajes. Los textos largos se recortan (actas hasta 3500 caracteres, Hunter Canvas hasta 12000). Adjuntar un documento no implica que sea legible. Business Case: solo metadatos si no hay texto extraído.
+${warnings.length ? warnings.join('\n') : 'Sin errores de consulta detectados; la lectura sigue limitada a la ventana indicada.'}
+
+FECHA ACTUAL
 ${new Date().toISOString().slice(0, 10)}
 
 FICHA DEL CANAL
@@ -199,6 +213,7 @@ ${benchmarkEntries.length ? benchmarkEntries.map(entry => {
     context,
     savedMessages,
     memoryError: memoryRes?.error || null,
+    warnings,
     stats: {
       activities: completedInteractions.length + visits.length + notes.length,
       meetings: meetings.length,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import BusinessCase from '../components/BusinessCase';
+import { hunterManualAccessEnabled } from '../lib/hunterTransition.mjs';
 import PreVisitBrief from '../components/PreVisitBrief';
 import ChannelClassification from '../components/ChannelClassification';
 import ClassificationSelector from '../components/ClassificationSelector';
@@ -665,7 +666,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
               </div>
               <button type="button" onClick={() => setCopilotOpen(true)}
                 className="col-span-2 col-start-2 row-start-2 flex w-fit max-w-full flex-shrink-0 items-center gap-1 rounded-lg border border-navy-100 bg-navy-50 px-2 py-1.5 text-[10px] font-bold leading-none text-navy-700 transition-colors hover:border-navy-200 hover:bg-navy-100 sm:ml-auto sm:gap-1.5 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs [&>svg]:text-navy-500">
-                <Sparkles className="h-3 w-3 flex-shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="truncate">Explícame esta cuenta</span>
+                <Sparkles className="h-3 w-3 flex-shrink-0 sm:h-3.5 sm:w-3.5" /> <span className="truncate">Hunter Canvas</span>
               </button>
               <button type="button" onClick={startEdit} aria-label="Editar canal"
                 className="col-start-3 row-start-1 flex-shrink-0 rounded-lg p-1.5 text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary sm:p-2">
@@ -825,9 +826,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <BusinessCase channelId={channelId} />
       </div>
 
-      <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
+      {hunterManualAccessEnabled(import.meta.env.VITE_HUNTER_CANVAS_LAUNCHED_AT) && <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
         <BusinessCase channelId={channelId} documentType="hunter_canvas" />
-      </div>
+      </div>}
 
       <div className="mb-3">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />
@@ -838,7 +839,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       </div>
       </div>
 
-      <ChannelCopilotPanel open={copilotOpen} onClose={() => setCopilotOpen(false)} channel={channel} />
+      <ChannelCopilotPanel key={channel.id} open={copilotOpen} onClose={() => setCopilotOpen(false)} channel={channel} />
     </div>
   );
 }

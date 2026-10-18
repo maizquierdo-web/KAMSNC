@@ -6,16 +6,18 @@ import BenchmarkCandidateModal from './BenchmarkCandidateModal';
 import { detectBenchmarkCandidate } from '../lib/benchmarkCapture';
 import { useAuthContext } from './AuthProvider';
 import { loadChannelAiContext } from '../lib/channelAiContext';
+import { hunterSystem, documentRequest, parseHunterDocument } from '../lib/hunterCanvas.mjs';
+import HunterDocumentReview from './HunterDocumentReview';
+import BusinessCase from './BusinessCase';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
 
 const SUGGESTIONS = [
-  '¿Qué debo hacer ahora?',
-  '¿Qué ocurrió en la última interacción?',
-  '¿Qué está pendiente?',
+  'Construyamos mi Hunter Canvas por bloques',
   'Prepárame la próxima reunión',
-  'Redacta un correo de seguimiento',
+  'Revisemos la propuesta de valor',
+  '¿Qué bloqueos y datos pendientes debo resolver?',
 ];
 
 function useDesktopPanelLayout() {
@@ -45,25 +47,40 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   const [benchmarkCandidate, setBenchmarkCandidate] = useState(null);
   const [benchmarkNotice, setBenchmarkNotice] = useState('');
   const [memoryNotice, setMemoryNotice] = useState('');
+  const [contextWarnings, setContextWarnings] = useState([]);
+  const [documentDraft, setDocumentDraft] = useState(null);
+  const [generatingDocument, setGeneratingDocument] = useState(false);
+  const session = useRef(0);
+  const requestLock = useRef(false);
   const endRef = useRef(null);
 
   useEffect(() => {
     if (!open || !channel?.id) return;
     setMessages([]);
+    setContext('');
     setInput('');
     setError('');
     setBenchmarkCandidate(null);
     setBenchmarkNotice('');
     setMemoryNotice('');
+    requestLock.current = false;
+    setLoading(false);
+    setGeneratingDocument(false);
+    setDocumentDraft(null);
+    setContextWarnings([]);
+    session.current += 1;
     loadContext();
+    return () => { session.current += 1; };
   }, [open, channel?.id]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
   async function loadContext() {
+    const current = session.current;
     setLoadingContext(true);
     try {
       const loaded = await loadChannelAiContext(channel);
+      if (current !== session.current) return;
       const savedMessages = loaded.savedMessages;
 
       if (loaded.memoryError) {
@@ -74,13 +91,14 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
       }
       setContext(loaded.context);
       setContextStats(loaded.stats);
+      setContextWarnings(loaded.warnings || []);
       setMessages(savedMessages);
-      await askCopilot('Resume el estado actual del canal en un máximo de cuatro frases e indica el siguiente paso más importante.', loaded.context, true, savedMessages);
+      await askCopilot('Retoma esta cuenta a partir del contexto y la conversación existente. En un máximo de 180 palabras ofrece una lectura inicial de la oportunidad, un encaje concreto como hipótesis si procede y dos o tres preguntas críticas. Etiqueta la evidencia, señala las limitaciones de lectura y no vuelvas a pedir datos ya disponibles. No construyas aún el Canvas completo.', loaded.context, true, savedMessages);
     } catch (contextError) {
       console.error('Error cargando contexto del canal:', contextError);
-      setError('No se pudo cargar todo el contexto del canal.');
+      if (current === session.current) setError('No se pudo cargar todo el contexto del canal.');
     } finally {
-      setLoadingContext(false);
+      if (current === session.current) setLoadingContext(false);
     }
   }
 
@@ -96,7 +114,9 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
   }
 
   async function askCopilot(question, contextOverride = context, isInitial = false, historyOverride = messages) {
-    if (!question.trim() || loading) return;
+    if (!question.trim() || requestLock.current) return;
+    requestLock.current = true;
+    const current = session.current;
     setLoading(true);
     if (!isInitial) {
       setMessages(previous => [...previous, { role: 'user', text: question }]);
@@ -108,6 +128,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
         setMemoryNotice('El mensaje se ha enviado, pero no se pudo guardar en la memoria.');
       }
     }
+    if (current !== session.current) return;
     setInput('');
     setError('');
     try {
@@ -118,19 +139,13 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: `Eres el copiloto comercial de una ficha de canal del CRM de Naturgy. Responde en español, con precisión y de forma práctica.
-Usa EXCLUSIVAMENTE el contexto proporcionado. No inventes datos, acuerdos, fechas ni riesgos. Si falta información, dilo claramente.
-Usa las actas de reunión como contexto acumulado del canal. Ten en cuenta sus acuerdos, objeciones, compromisos y cambios de criterio; si dos actas se contradicen, prioriza la más reciente e indica la discrepancia cuando sea relevante.
-Prioriza: situación actual, pendientes, siguiente acción concreta y preparación comercial. Sé conciso salvo que el usuario pida un correo o un guion completo.
-La conversación previa es memoria persistente de este canal. Puedes usar la información aportada por los usuarios en ella, pero no conviertas tus propias respuestas anteriores en hechos si no estaban respaldadas por el usuario o por la ficha.
-
-CONTEXTO DEL CANAL:
-${contextOverride}`,
+          system: hunterSystem(contextOverride),
           messages: [...previousMessages, { role: 'user', content: question }],
         }),
       });
       if (!response.ok) throw new Error('No se pudo conectar con el asistente');
       const data = await response.json();
+      if (current !== session.current) return;
       const answer = data.content?.map(item => item.text || '').join('').trim();
       if (!answer) throw new Error('El asistente no devolvió una respuesta');
       setMessages(previous => [...previous, { role: 'assistant', text: answer, initial: isInitial }]);
@@ -157,7 +172,7 @@ ${contextOverride}`,
 
         detectBenchmarkCandidate(userTranscript, { benchmarkProfile: profile?.benchmark_profile })
           .then(candidate => {
-            if (!candidate) return;
+            if (!candidate || current !== session.current) return;
             setBenchmarkCandidate({
               candidate,
               source: {
@@ -173,27 +188,57 @@ ${contextOverride}`,
       }
     } catch (requestError) {
       console.error('Error consultando el copiloto:', requestError);
-      setError(requestError.message || 'No se pudo obtener una respuesta.');
+      if (current === session.current) setError(requestError.message || 'No se pudo obtener una respuesta.');
     } finally {
-      setLoading(false);
+      if (current === session.current) { requestLock.current = false; setLoading(false); }
+    }
+  }
+
+  async function generateDocument(kind) {
+    if (requestLock.current || loadingContext || !context) return;
+    if (documentDraft && !window.confirm('¿Descartar el borrador actual y generar uno nuevo?')) return;
+    requestLock.current = true;
+    const current = session.current;
+    setGeneratingDocument(true); setError('');
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/assistant`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ system: hunterSystem(context), messages: [
+          ...messages.filter(message => !message.initial).slice(-20).map(message => ({ role: message.role, content: message.text })),
+          { role: 'user', content: documentRequest(kind) },
+        ] }),
+      });
+      if (!response.ok) throw new Error('No se pudo generar el documento. Puedes reintentar sin perder la conversación.');
+      const data = await response.json();
+      const draft = parseHunterDocument(data.content?.map(item => item.text || '').join('') || '', kind);
+      if (current === session.current) setDocumentDraft({ draft, kind, date: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(new Date()) });
+    } catch (err) {
+      if (current === session.current) setError(err.message || 'No se pudo generar el documento.');
+    } finally {
+      if (current === session.current) { requestLock.current = false; setGeneratingDocument(false); }
     }
   }
 
   if (!open) return null;
+
+  function closePanel() {
+    if (documentDraft && !window.confirm('El borrador puede contener cambios sin guardar. ¿Cerrar Hunter Canvas?')) return;
+    onClose();
+  }
 
   const initialSummary = messages.find(message => message.initial);
   const conversation = messages.filter(message => !message.initial);
 
   const panel = (
     <>
-      <button aria-label="Cerrar copiloto" onClick={onClose} className="channel-copilot-backdrop fixed inset-0 z-40 bg-slate-950/15" />
+      <button aria-label="Cerrar Hunter Canvas" onClick={closePanel} className="channel-copilot-backdrop fixed inset-0 z-40 bg-slate-950/15" />
       <aside className="channel-copilot-panel flex min-h-0 flex-col border-l border-surface-3 bg-[#f7fafc] text-text-primary shadow-2xl">
         <div className="relative z-10 flex flex-shrink-0 items-start justify-between border-b border-navy-100 bg-navy-50 px-4 py-4">
           <div className="flex gap-2.5">
             <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-navy-100 text-navy-600"><Sparkles size={18} /></div>
-            <div><h2 className="text-base font-extrabold text-slate-800">Copiloto del canal</h2><p className="mt-0.5 text-[10px] text-slate-500">Contexto: {channel.name}</p></div>
+            <div><h2 className="text-base font-extrabold text-slate-800">Hunter Canvas</h2><p className="mt-0.5 text-[10px] text-slate-500">Prepara tu próxima conversación · {channel.name}</p></div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"><X size={18} /></button>
+          <button aria-label="Cerrar Hunter Canvas" onClick={closePanel} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700"><X size={18} /></button>
         </div>
 
         <div className="flex-shrink-0 border-b border-surface-3 bg-white px-4 py-3">
@@ -210,26 +255,36 @@ ${contextOverride}`,
           {memoryNotice && (
             <div className="mt-2 text-[9px] text-slate-500">{memoryNotice}</div>
           )}
+          <p className="mt-2 text-[10px] text-slate-500">Ventana reciente: hasta 20 interacciones, 10 visitas, 10 notas, 15 actas y 40 mensajes. Solo documentos con texto legible.</p>
+          {contextWarnings.length > 0 && <p role="status" className="mt-2 text-[10px] text-amber-700">Lectura parcial: {contextWarnings.join(' · ')}</p>}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="mb-3"><BusinessCase channelId={channel.id} documentType="hunter_canvas" allowUpload={false} /></div>
           {loadingContext && !initialSummary ? (
             <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-white p-4 text-xs text-slate-500"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
           ) : initialSummary && (
             <div className="mb-4 rounded-xl border border-navy-100 bg-white p-3.5 shadow-sm">
-              <div className="mb-1.5 text-xs font-bold text-navy-700">Resumen de {channel.name}</div>
+              <div className="mb-1.5 text-xs font-bold text-navy-700">Lectura Hunter de {channel.name}</div>
               <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">{initialSummary.text}</p>
             </div>
           )}
 
           <div className="mb-4 space-y-1.5">
             {SUGGESTIONS.map(suggestion => (
-              <button key={suggestion} onClick={() => askCopilot(suggestion)} disabled={loadingContext || loading}
+              <button key={suggestion} onClick={() => askCopilot(suggestion)} disabled={loadingContext || loading || generatingDocument || !context}
                 className="flex w-full items-center justify-between rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-left text-[11px] text-slate-600 transition-colors hover:border-navy-200 hover:bg-navy-50/40 disabled:opacity-40">
                 {suggestion}<MessageSquareText size={12} className="text-navy-500" />
               </button>
             ))}
           </div>
+
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button onClick={() => generateDocument('canvas')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg bg-navy-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Generar Hunter Canvas</button>
+            <button onClick={() => generateDocument('meeting')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-600 disabled:opacity-40">Generar guion de reunión</button>
+          </div>
+          {generatingDocument && <p role="status" className="mb-3 text-xs text-slate-500">Preparando el borrador para revisar…</p>}
+          {documentDraft && <HunterDocumentReview key={`${channel.id}-${documentDraft.kind}-${documentDraft.date}-${JSON.stringify(documentDraft.draft).length}`} value={documentDraft} channel={channel} onClose={() => setDocumentDraft(null)} onSaved={() => { window.dispatchEvent(new CustomEvent('hunter-canvas-saved', { detail: channel.id })); setMemoryNotice('Hunter Canvas guardado. Cierra y vuelve a abrir el panel para analizar la nueva versión.'); }} />}
 
           <div className="space-y-3">
             {conversation.map((message, index) => (
@@ -247,9 +302,9 @@ ${contextOverride}`,
           <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-surface-1 p-1.5 focus-within:border-navy-300">
             <FileText size={15} className="ml-2 flex-shrink-0 text-slate-400" />
             <input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') askCopilot(input); }}
-              disabled={loadingContext || loading} placeholder="Pregunta o añade información sobre este canal"
+              disabled={loadingContext || loading || generatingDocument || !context} placeholder="Pregunta o añade información sobre este canal"
               className="min-w-0 flex-1 bg-transparent px-1 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none disabled:opacity-50" />
-            <button onClick={() => askCopilot(input)} disabled={!input.trim() || loadingContext || loading}
+            <button aria-label="Enviar mensaje a Hunter Canvas" onClick={() => askCopilot(input)} disabled={!input.trim() || loadingContext || loading || generatingDocument || !context}
               className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-navy-500 text-white hover:bg-navy-600 disabled:opacity-30"><ArrowUp size={16} /></button>
           </div>
         </div>

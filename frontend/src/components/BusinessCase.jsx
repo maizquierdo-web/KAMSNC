@@ -32,7 +32,7 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-export default function BusinessCase({ channelId, documentType = 'business_case' }) {
+export default function BusinessCase({ channelId, documentType = 'business_case', allowUpload = true }) {
   const { user } = useAuthContext();
   const config = DOCUMENT_CONFIG[documentType] || DOCUMENT_CONFIG.business_case;
   const DocumentIcon = config.icon;
@@ -171,6 +171,8 @@ export default function BusinessCase({ channelId, documentType = 'business_case'
     );
   }
 
+  if (!allowUpload && !businessCase) return null;
+
   if (!businessCase) {
     return (
       <div className="bg-white border border-surface-3 rounded-xl p-3.5">
@@ -230,7 +232,7 @@ export default function BusinessCase({ channelId, documentType = 'business_case'
             {opening ? <Loader2 size={13} className="animate-spin" /> : <ExternalLink size={13} />}
             Abrir
           </button>
-          <button
+          {allowUpload && <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
@@ -241,8 +243,8 @@ export default function BusinessCase({ channelId, documentType = 'business_case'
             ) : (
               <><RefreshCw size={13} /> Sustituir</>
             )}
-          </button>
-          {fileInput}
+          </button>}
+          {allowUpload && fileInput}
         </div>
       </div>
     </div>

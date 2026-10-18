@@ -8,6 +8,7 @@ import { useAuthContext } from './AuthProvider';
 import { loadChannelAiContext } from '../lib/channelAiContext';
 import { hunterSystem, documentRequest, parseHunterDocument } from '../lib/hunterCanvas.mjs';
 import HunterDocumentReview from './HunterDocumentReview';
+import BusinessCase from './BusinessCase';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
@@ -259,6 +260,7 @@ export default function ChannelCopilotPanel({ open, onClose, channel }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="mb-3"><BusinessCase channelId={channel.id} documentType="hunter_canvas" allowUpload={false} /></div>
           {loadingContext && !initialSummary ? (
             <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-white p-4 text-xs text-slate-500"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
           ) : initialSummary && (

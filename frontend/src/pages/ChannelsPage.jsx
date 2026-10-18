@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import BusinessCase from '../components/BusinessCase';
+import { hunterManualAccessEnabled } from '../lib/hunterTransition.mjs';
 import PreVisitBrief from '../components/PreVisitBrief';
 import ChannelClassification from '../components/ChannelClassification';
 import ClassificationSelector from '../components/ClassificationSelector';
@@ -825,9 +826,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         <BusinessCase channelId={channelId} />
       </div>
 
-      <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
+      {hunterManualAccessEnabled(import.meta.env.VITE_HUNTER_CANVAS_LAUNCHED_AT) && <div id="channel-hunter-canvas" className="mb-3 scroll-mt-20">
         <BusinessCase channelId={channelId} documentType="hunter_canvas" />
-      </div>
+      </div>}
 
       <div className="mb-3">
         <PreVisitBrief channelId={channelId} channelName={channel.name} />

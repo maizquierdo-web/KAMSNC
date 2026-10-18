@@ -14,7 +14,13 @@ El prompt adapta Superprompt Agente Hunter Canvas v3 aportado por el usuario. Co
 - El texto guardado señala que fue generado con asistencia de IA y conserva etiquetas. Guardar no convierte hipótesis en hechos ni altera acciones, estados ni clasificaciones.
 - El guion no sustituye al Canvas. El documento anterior subido sigue accesible desde la ficha hasta que el usuario confirme su sustitución.
 
-## Alcance y limitaciones
+## Transición de la carga manual
+
+En el despliegue inicial, configurar `VITE_HUNTER_CANVAS_LAUNCHED_AT` con la fecha/hora ISO real de publicación (incluido huso horario). Mantener ese mismo valor en despliegues posteriores. El bloque existente de adjuntar/sustituir y abrir en la ficha se conserva durante un mes natural desde esa fecha; después se oculta. Si falta la variable o no es válida, se mantiene visible para no cerrar anticipadamente la transición. No utilizar la fecha de compilación, pues cada despliegue reiniciaría el plazo.
+
+El documento guardado sigue disponible para abrir/descargar desde el propio panel Hunter Canvas, también después de la transición. La generación, revisión, descarga de Word y guardado desde el agente permanecen. Benchmark conserva su aportación directa y las sugerencias confirmadas por el KAM, sin caducidad. El análisis de cuenta existente se mantiene dentro del método Hunter Canvas.
+
+## Contexto y almacenamiento
 
 No requiere migración nueva. Requiere las tablas, columna extracted_text, document_type y permisos privados ya existentes para Hunter Canvas. Se respetan sus políticas RLS; no se amplían permisos.
 

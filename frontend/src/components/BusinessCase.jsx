@@ -44,6 +44,9 @@ export default function BusinessCase({ channelId, documentType = 'business_case'
 
   useEffect(() => {
     if (channelId) loadBusinessCase();
+    const refresh = event => { if (event.detail === channelId && documentType === 'hunter_canvas') loadBusinessCase(); };
+    window.addEventListener('hunter-canvas-saved', refresh);
+    return () => window.removeEventListener('hunter-canvas-saved', refresh);
   }, [channelId, documentType]);
 
   async function loadBusinessCase() {

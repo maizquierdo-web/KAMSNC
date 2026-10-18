@@ -51,14 +51,13 @@
     background-color: #ffffff;
   }
 
-  /* El copiloto solo se integra como columna en un escritorio real. En móviles
-     con "sitio de escritorio" o zoom reducido, el ancho deja de ser fiable;
-     el puntero táctil mantiene el panel completo y evita recortar cabecera y chat. */
+  /* Ambos agentes se abren a la derecha. La disposición depende del ancho,
+     también en portátiles táctiles; no del tipo de ratón o puntero. */
   .channel-copilot-panel {
     position: fixed;
     inset: 0 0 0 auto;
     z-index: 50;
-    width: 100%;
+    width: min(440px, calc(100% - 24px));
     height: 100dvh;
     overflow: hidden;
   }
@@ -67,13 +66,7 @@
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
-  @media (min-width: 640px) and (hover: hover) and (pointer: fine) {
-    .channel-copilot-panel {
-      width: 440px;
-    }
-  }
-
-  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  @media (min-width: 1024px) {
     .channel-copilot-backdrop {
       display: none;
     }

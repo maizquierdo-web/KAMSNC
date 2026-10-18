@@ -11,7 +11,7 @@ import HunterDocumentReview from './HunterDocumentReview';
 import BusinessCase from './BusinessCase';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
-const DESKTOP_PANEL_QUERY = '(min-width: 1024px) and (hover: hover) and (pointer: fine)';
+const DESKTOP_PANEL_QUERY = '(min-width: 1024px)';
 
 const SUGGESTIONS = [
   'Construyamos mi Hunter Canvas por bloques',

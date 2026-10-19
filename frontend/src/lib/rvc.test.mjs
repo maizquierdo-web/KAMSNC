@@ -42,6 +42,27 @@ test('semester boundaries use Madrid even when the browser is elsewhere', () => 
   assert.equal(semesterRange(-1, r.from).from.toISOString(), '2025-12-31T23:00:00.000Z');
 });
 
+test('Otros counts once per gestor for leads and active conversions, including stored descriptions', () => {
+  const channels = [
+    { id: 'a', assigned_to: 'judith', lead_source: ['otros:Prospección propia'], status: 'activo' },
+    { id: 'b', assigned_to: 'judith', lead_source: ['otros', 'evento'], status: 'en_desarrollo' },
+    { id: 'c', assigned_to: 'egoitz', lead_source: ['otros:Captación'], status: 'activo' },
+    { id: 'd', assigned_to: 'judith', lead_source: ['canal_naturgy'], status: 'activo' },
+    { id: 'e', assigned_to: 'judith', lead_source: null, status: 'activo' },
+  ];
+  const judith = calculateRvc([...channels, channels[0]], [], [], [], 'judith');
+  assert.equal(judith.leads, 2);
+  assert.equal(judith.converted, 1);
+  assert.equal(judith.successRate, '50.0');
+  const egoitz = calculateRvc(channels, [], [], [], 'egoitz');
+  assert.equal(egoitz.leads, 1);
+  assert.equal(egoitz.converted, 1);
+  const team = calculateRvc(channels, [], [], []);
+  assert.equal(team.leads, 3);
+  assert.equal(team.converted, 2);
+  assert.equal(team.successRate, '66.7');
+});
+
 test('pagination handles an API cap smaller than requested page and propagates errors', async () => {
   const all = Array.from({ length: 7 }, (_, id) => ({ id }));
   const factory = () => ({ order() { return this; }, async range(start) { return { data: all.slice(start, start + 2), error: null }; } });

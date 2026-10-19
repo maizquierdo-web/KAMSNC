@@ -1,4 +1,4 @@
-const PUSH = new Set(['evento', 'congreso', 'webinar', 'linkedin_sales_navigator', 'asociacion_sectorial', 'paginas_empleo']);
+import { isPushLead } from './leadSources.mjs';
 const STATUSES = new Set(['pendiente_contacto', 'en_desarrollo', 'en_evaluacion', 'rechazado', 'cierre_sin_acuerdo', 'en_proceso_alta', 'activo']);
 
 export function semesterRange(offset = 0, now = new Date()) {
@@ -49,7 +49,7 @@ export function visitDecision(visit, history = []) {
 
 export function calculateRvc(channels, activeChannels, visits, history, managerId = null) {
   const own = (rows, key) => [...new Map(rows.filter(r => !managerId || r[key] === managerId).map(r => [r.id, r])).values()];
-  const leads = own(channels, 'assigned_to').filter(c => Array.isArray(c.lead_source) && c.lead_source.some(s => PUSH.has(s)));
+  const leads = own(channels, 'assigned_to').filter(c => isPushLead(c.lead_source));
   const converted = leads.filter(c => c.status === 'activo').length;
   const decisions = own(visits, 'kam_id').map(v => visitDecision(v, history));
   return {

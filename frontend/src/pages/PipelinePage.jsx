@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import { useChannelTypes } from '../hooks/useChannelTypes';
+import { leadOriginGroups, normalizeLeadSources } from '../lib/leadSources.mjs';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
 import {
   PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, stageToStatus, LEAD_SOURCE_OPTIONS,
@@ -83,14 +84,9 @@ async function getChannelLastActivity(channelId) {
 }
 
 // ============ CHANNEL CARD ============
-function leadOriginGroups(sources) {
-  return ['push', 'pull'].filter(group => LEAD_SOURCE_OPTIONS.some(option =>
-    option.group === group && Array.isArray(sources) && sources.includes(option.value)
-  ));
-}
-
 function LeadOriginBadge({ sources }) {
-  const selected = LEAD_SOURCE_OPTIONS.filter(option => Array.isArray(sources) && sources.includes(option.value));
+  const values = normalizeLeadSources(sources);
+  const selected = LEAD_SOURCE_OPTIONS.filter(option => values.includes(option.value));
   const groups = leadOriginGroups(sources);
   const title = selected.length ? selected.map(option => option.label).join(', ') : 'El canal no tiene un origen de lead informado';
   return (

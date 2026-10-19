@@ -45,7 +45,7 @@ function LeadSourceCheckboxes({ value = [], onChange, otherText = '', onOtherTex
   };
 
   const pullOptions = LEAD_SOURCE_OPTIONS.filter(o => o.group === 'pull');
-  const pushOptions = LEAD_SOURCE_OPTIONS.filter(o => o.group === 'push');
+  const pushOptions = LEAD_SOURCE_OPTIONS.filter(o => o.group === 'push' && o.value !== 'otros');
   const otrosOption = LEAD_SOURCE_OPTIONS.find(o => o.value === 'otros');
   const otrosChecked = value.includes('otros');
 

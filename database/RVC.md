@@ -3,6 +3,7 @@
 Periodo: semestres naturales en Europe/Madrid, desde el inicio incluido hasta el inicio del semestre siguiente excluido.
 
 - Leads: canales creados en el semestre con algún origen PUSH. Cada canal cuenta una vez.
+- «Otros» se considera PUSH, tanto `otros` como `otros:descripción`. Se aplica a los datos existentes sin reescritura. La clasificación se comparte con el pipeline; no se deduce un origen para canales sin informar.
 - Éxito: esos leads actualmente activos / esos leads × 100; sin leads, 0 %.
 - Captación: esos mismos leads PUSH actualmente activos. Se conserva expresamente la fecha de creación, no la fecha de activación.
 - Volumen: todos los canales actualmente activos, separados por unidad, sin filtro de semestre.

@@ -10,6 +10,8 @@ Se añade únicamente una nota de integración después del prompt íntegro: el 
 
 ## Documentos
 
+Actualización posterior: las preguntas se realizan de una en una, esperando respuesta. El botón de investigación pública permite consultar información web citada usando solo el nombre de la empresa. Requiere publicar el cambio de KAMAPP; consultar HUNTER_WEB_DEPLOYMENT.md. Estas reglas sustituyen las instrucciones incompatibles del superprompt original sin alterar su archivo fuente.
+
 - Hunter Canvas: ocho bloques, tesis y evidencia con fuentes. Word editable.
 - Preparación de reunión: diez secciones inspiradas en la estructura del ejemplo THERMABEAD (lectura, mapa, propuesta, guion, preguntas, objeciones, cierre, acuerdos, cualificación y checklist). No incluye sus datos como contexto de otras cuentas. Word editable, descargable por separado.
 - La respuesta JSON debe validarse antes de mostrar un borrador. El usuario puede editar textos, fuentes y etiquetas. Requiere marcar revisión antes de descargar/guardar.

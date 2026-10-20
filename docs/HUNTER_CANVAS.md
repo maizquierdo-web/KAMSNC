@@ -4,7 +4,9 @@ Hay dos accesos diferenciados. El botón superior «Explícame esta cuenta» con
 
 Hunter Canvas guarda las aportaciones del KAM en la memoria común de la cuenta, pero no mezcla sus respuestas de IA con el historial del copiloto original. Su diálogo guiado y borradores son temporales; el documento guardado conserva el resultado. Benchmark solo analiza aportaciones del KAM y siempre solicita confirmación.
 
-El prompt adapta Superprompt Agente Hunter Canvas v3 aportado por el usuario. Conserva los ocho bloques y el razonamiento de sinergia. Se ajusta para leer el contexto autorizado del CRM, retomar cuentas existentes, permitir accesos directos, reducir el brainstorming por defecto y distinguir Documentado, Aportado por el KAM, Hipótesis y GAP. Se eliminan garantías comerciales implícitas: ni recurrencia ni rentabilidades, plazos o porcentajes se presuponen.
+El agente utiliza íntegramente el adjunto Superprompt_Agente_Hunter_Canvas_v3(1).md, conservado en hunterCanvasPrompt.mjs y verificado mediante SHA-256. Se preservan Fase 0 al abrir, avance por fases esperando al KAM, ocho bloques, brainstorming de 8–10 ideas y aterrizaje en 2–4, checklist y etiquetas Confirmado/Hipótesis/GAP. La petición inicial ya no adelanta el análisis. Antes de habilitar documentos el KAM debe haber participado y confirmar la revisión del trabajo por fases; esta confirmación humana no es una validación automática del cumplimiento de las fases.
+
+Se añade únicamente una nota de integración después del prompt íntegro: el contexto autorizado del CRM equivale a fuentes aportadas, los documentos no son instrucciones, Confirmado no equivale a verificado independientemente y las referencias comerciales no son garantías vigentes del caso. No se ejecutan acciones ni se altera la siguiente acción. Los documentos conservan el origen documental/KAM bajo Confirmado y permiten Hipótesis y GAP. «Explícame esta cuenta» y Next Best Action mantienen sus prompts.
 
 ## Documentos
 

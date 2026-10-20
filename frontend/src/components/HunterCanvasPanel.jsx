@@ -50,6 +50,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
   const [contextWarnings, setContextWarnings] = useState([]);
   const [documentDraft, setDocumentDraft] = useState(null);
   const [generatingDocument, setGeneratingDocument] = useState(false);
+  const [phasesReviewed, setPhasesReviewed] = useState(false);
   const session = useRef(0);
   const requestLock = useRef(false);
   const endRef = useRef(null);
@@ -67,6 +68,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
     setLoading(false);
     setGeneratingDocument(false);
     setDocumentDraft(null);
+    setPhasesReviewed(false);
     setContextWarnings([]);
     session.current += 1;
     loadContext();
@@ -95,7 +97,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
       setContextStats(loaded.stats);
       setContextWarnings(loaded.warnings || []);
       setMessages(savedMessages);
-      await askCopilot('Retoma esta cuenta a partir del contexto y la conversación existente. En un máximo de 180 palabras ofrece una lectura inicial de la oportunidad, un encaje concreto como hipótesis si procede y dos o tres preguntas críticas. Etiqueta la evidencia, señala las limitaciones de lectura y no vuelvas a pedir datos ya disponibles. No construyas aún el Canvas completo.', loaded.context, true, savedMessages);
+      await askCopilot('Inicia la Fase 0 de tu prompt maestro: preséntate en dos líneas, pide confirmar la empresa de la ficha y revisar o completar información y fuentes. Pregunta el equipo si es ambiguo. Espera al KAM antes de analizar y avanzar.', loaded.context, true, savedMessages);
     } catch (contextError) {
       console.error('Error cargando contexto del canal:', contextError);
       if (current === session.current) setError('No se pudo cargar todo el contexto del canal.');
@@ -188,6 +190,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
   }
 
   async function generateDocument(kind) {
+    if (!phasesReviewed) return;
     if (requestLock.current || loadingContext || !context) return;
     if (documentDraft && !window.confirm('¿Descartar el borrador actual y generar uno nuevo?')) return;
     requestLock.current = true;
@@ -272,9 +275,13 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
             ))}
           </div>
 
+          <label className="mb-2 flex items-start gap-2 text-[11px] text-slate-600">
+            <input type="checkbox" checked={phasesReviewed} onChange={event => setPhasesReviewed(event.target.checked)} disabled={loadingContext || loading || generatingDocument || !messages.some(message => message.role === 'user')} />
+            He revisado el trabajo por fases y quiero generar el material final.
+          </label>
           <div className="mb-4 flex flex-wrap gap-2">
-            <button onClick={() => generateDocument('canvas')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg bg-navy-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Generar Hunter Canvas</button>
-            <button onClick={() => generateDocument('meeting')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-600 disabled:opacity-40">Generar guion de reunión</button>
+            <button onClick={() => generateDocument('canvas')} disabled={!phasesReviewed || loadingContext || loading || generatingDocument || !context} className="rounded-lg bg-navy-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Generar Hunter Canvas</button>
+            <button onClick={() => generateDocument('meeting')} disabled={!phasesReviewed || loadingContext || loading || generatingDocument || !context} className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-600 disabled:opacity-40">Generar guion de reunión</button>
           </div>
           {generatingDocument && <p role="status" className="mb-3 text-xs text-slate-500">Preparando el borrador para revisar…</p>}
           {documentDraft && <HunterDocumentReview key={`${channel.id}-${documentDraft.kind}-${documentDraft.date}-${JSON.stringify(documentDraft.draft).length}`} value={documentDraft} channel={channel} onClose={() => setDocumentDraft(null)} onSaved={() => { window.dispatchEvent(new CustomEvent('hunter-canvas-saved', { detail: channel.id })); setMemoryNotice('Hunter Canvas guardado. Cierra y vuelve a abrir el panel para analizar la nueva versión.'); }} />}

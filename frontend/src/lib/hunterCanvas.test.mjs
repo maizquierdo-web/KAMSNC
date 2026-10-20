@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { HUNTER_MASTER_PROMPT } from './hunterCanvasPrompt.mjs';
 import { HUNTER_BLOCKS, MEETING_BLOCKS, hunterSystem, documentRequest, parseHunterDocument, documentText } from './hunterCanvas.mjs';
 import { hunterFileName, createHunterDocx } from './hunterDocx.mjs';
 
@@ -33,6 +35,17 @@ test('prompt distinguishes business lines and never promises financial or automa
   const prompt = hunterSystem('CANAL CONTEXTO');
   for (const value of ['CAEs', 'mayorista', 'comunidades solares', '[Hipótesis]', '[GAP]', 'no son evidencia primaria', 'no ejecutes acciones automáticamente', 'CANAL CONTEXTO']) assert.ok(prompt.includes(value));
   assert.match(documentRequest('meeting'), /Guion de la reunión/);
+});
+
+test('master prompt is used in full and preserves phased work and source labels', () => {
+  assert.ok(HUNTER_MASTER_PROMPT.includes('## 8. ARRANQUE'));
+  assert.ok(HUNTER_MASTER_PROMPT.includes('brainstorming de 8-10 ideas/hipótesis'));
+  assert.ok(HUNTER_MASTER_PROMPT.includes('2-4 ideas concretas'));
+  assert.ok(HUNTER_MASTER_PROMPT.includes('No te saltes fases'));
+  assert.ok(hunterSystem('Ficha de ejemplo').startsWith(HUNTER_MASTER_PROMPT));
+  assert.ok(!documentRequest('canvas').includes('No exijas completar fases'));
+  assert.match(documentRequest('canvas'), /KAM ha confirmado/);
+  assert.equal(createHash('sha256').update(HUNTER_MASTER_PROMPT).digest('hex'), 'cf9181ac2d0f7a127147b84afe68ed950e04364428f5c5ceeacd49bd192a3885');
 });
 
 test('safe Word filenames and a genuine OOXML zip file', async () => {

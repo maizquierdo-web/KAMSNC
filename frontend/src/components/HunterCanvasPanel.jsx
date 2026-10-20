@@ -9,6 +9,7 @@ import { loadChannelAiContext } from '../lib/channelAiContext';
 import { hunterSystem, documentRequest, parseHunterDocument } from '../lib/hunterCanvas.mjs';
 import HunterDocumentReview from './HunterDocumentReview';
 import BusinessCase from './BusinessCase';
+import { researchRequest, parseResearch, researchContext } from '../lib/hunterResearch.mjs';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 const DESKTOP_PANEL_QUERY = '(min-width: 1024px)';
@@ -50,6 +51,9 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
   const [contextWarnings, setContextWarnings] = useState([]);
   const [documentDraft, setDocumentDraft] = useState(null);
   const [generatingDocument, setGeneratingDocument] = useState(false);
+  const [phasesReviewed, setPhasesReviewed] = useState(false);
+  const [webResearch, setWebResearch] = useState(null);
+  const [researching, setResearching] = useState(false);
   const session = useRef(0);
   const requestLock = useRef(false);
   const endRef = useRef(null);
@@ -67,6 +71,9 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
     setLoading(false);
     setGeneratingDocument(false);
     setDocumentDraft(null);
+    setPhasesReviewed(false);
+    setWebResearch(null);
+    setResearching(false);
     setContextWarnings([]);
     session.current += 1;
     loadContext();
@@ -95,7 +102,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
       setContextStats(loaded.stats);
       setContextWarnings(loaded.warnings || []);
       setMessages(savedMessages);
-      await askCopilot('Retoma esta cuenta a partir del contexto y la conversación existente. En un máximo de 180 palabras ofrece una lectura inicial de la oportunidad, un encaje concreto como hipótesis si procede y dos o tres preguntas críticas. Etiqueta la evidencia, señala las limitaciones de lectura y no vuelvas a pedir datos ya disponibles. No construyas aún el Canvas completo.', loaded.context, true, savedMessages);
+      await askCopilot('Inicia la Fase 0: preséntate en dos líneas y haz UNA sola pregunta para confirmar si trabajamos la empresa de la ficha. No pidas aún fuentes, equipo ni otros datos. Espera la respuesta.', loaded.context, true, savedMessages);
     } catch (contextError) {
       console.error('Error cargando contexto del canal:', contextError);
       if (current === session.current) setError('No se pudo cargar todo el contexto del canal.');
@@ -134,14 +141,15 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
     setInput('');
     setError('');
     try {
-      const previousMessages = historyOverride.filter(message => !message.initial).slice(-20).map(message => ({
+      const previousMessages = historyOverride.slice(-20).map(message => ({
         role: message.role === 'assistant' ? 'assistant' : 'user', content: message.text,
       }));
       const response = await fetch(`${BACKEND_URL}/api/assistant`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: hunterSystem(contextOverride),
+          mode: 'hunter_canvas',
+          system: hunterSystem(contextOverride + researchContext(webResearch)),
           messages: [...previousMessages, { role: 'user', content: question }],
         }),
       });
@@ -188,6 +196,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
   }
 
   async function generateDocument(kind) {
+    if (!phasesReviewed) return;
     if (requestLock.current || loadingContext || !context) return;
     if (documentDraft && !window.confirm('¿Descartar el borrador actual y generar uno nuevo?')) return;
     requestLock.current = true;
@@ -196,7 +205,7 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
     try {
       const response = await fetch(`${BACKEND_URL}/api/assistant`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ system: hunterSystem(context), messages: [
+        body: JSON.stringify({ mode: 'hunter_canvas', system: hunterSystem(context + researchContext(webResearch)), messages: [
           ...messages.filter(message => !message.initial).slice(-20).map(message => ({ role: message.role, content: message.text })),
           { role: 'user', content: documentRequest(kind) },
         ] }),
@@ -213,6 +222,26 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
   }
 
   if (!open) return null;
+
+  async function searchCompany() {
+    if (requestLock.current) return;
+    requestLock.current = true;
+    const current = session.current;
+    setResearching(true); setLoading(true); setError('');
+    try {
+      const response = await fetch(`${BACKEND_URL}/api/assistant`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(researchRequest(channel.name)),
+      });
+      if (!response.ok) throw new Error('No se pudo consultar internet. Puedes continuar con la información de la ficha.');
+      const research = parseResearch(await response.json());
+      if (current === session.current) { setWebResearch(research); setPhasesReviewed(false); }
+    } catch (error) {
+      if (current === session.current) setError(error.message);
+    } finally {
+      if (current === session.current) { requestLock.current = false; setResearching(false); setLoading(false); }
+    }
+  }
 
   function closePanel() {
     if (documentDraft && !window.confirm('El borrador puede contener cambios sin guardar. ¿Cerrar Hunter Canvas?')) return;
@@ -254,6 +283,16 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div className="mb-3"><BusinessCase channelId={channel.id} documentType="hunter_canvas" allowUpload={false} /></div>
+          <div className="mb-3 rounded-lg border border-surface-3 bg-white p-3">
+            <button type="button" onClick={searchCompany} disabled={loadingContext || loading || generatingDocument} className="text-xs font-bold text-navy-700 disabled:opacity-40">{researching ? 'Consultando internet…' : 'Buscar información pública de la empresa'}</button>
+            <p className="mt-1 text-[10px] text-slate-500">La búsqueda utiliza solo el nombre de la empresa, sin actas ni notas internas.</p>
+            {webResearch && <details className="mt-2 text-xs text-slate-600">
+              <summary className="cursor-pointer">Investigación web y fuentes · {new Date(webResearch.at).toLocaleDateString('es-ES')}</summary>
+              <p className="mt-2 whitespace-pre-wrap">{webResearch.text}</p>
+              {webResearch.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="mt-1 block break-words text-navy-600 underline">{source.title}</a>)}
+              <button type="button" onClick={() => setWebResearch(null)} className="mt-2 text-[10px] underline">Retirar del contexto</button>
+            </details>}
+          </div>
           {loadingContext && !initialSummary ? (
             <div className="flex items-center gap-2 rounded-xl border border-surface-3 bg-white p-4 text-xs text-slate-500"><Loader2 size={15} className="animate-spin" /> Analizando el canal…</div>
           ) : initialSummary && (
@@ -272,9 +311,13 @@ export default function HunterCanvasPanel({ open, onClose, channel }) {
             ))}
           </div>
 
+          <label className="mb-2 flex items-start gap-2 text-[11px] text-slate-600">
+            <input type="checkbox" checked={phasesReviewed} onChange={event => setPhasesReviewed(event.target.checked)} disabled={loadingContext || loading || generatingDocument || !messages.some(message => message.role === 'user')} />
+            He revisado el trabajo por fases y quiero generar el material final.
+          </label>
           <div className="mb-4 flex flex-wrap gap-2">
-            <button onClick={() => generateDocument('canvas')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg bg-navy-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Generar Hunter Canvas</button>
-            <button onClick={() => generateDocument('meeting')} disabled={loadingContext || loading || generatingDocument || !context} className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-600 disabled:opacity-40">Generar guion de reunión</button>
+            <button onClick={() => generateDocument('canvas')} disabled={!phasesReviewed || loadingContext || loading || generatingDocument || !context} className="rounded-lg bg-navy-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Generar Hunter Canvas</button>
+            <button onClick={() => generateDocument('meeting')} disabled={!phasesReviewed || loadingContext || loading || generatingDocument || !context} className="rounded-lg border border-navy-200 bg-white px-3 py-2 text-xs font-bold text-navy-600 disabled:opacity-40">Generar guion de reunión</button>
           </div>
           {generatingDocument && <p role="status" className="mb-3 text-xs text-slate-500">Preparando el borrador para revisar…</p>}
           {documentDraft && <HunterDocumentReview key={`${channel.id}-${documentDraft.kind}-${documentDraft.date}-${JSON.stringify(documentDraft.draft).length}`} value={documentDraft} channel={channel} onClose={() => setDocumentDraft(null)} onSaved={() => { window.dispatchEvent(new CustomEvent('hunter-canvas-saved', { detail: channel.id })); setMemoryNotice('Hunter Canvas guardado. Cierra y vuelve a abrir el panel para analizar la nueva versión.'); }} />}

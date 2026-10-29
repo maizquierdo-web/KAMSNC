@@ -10,14 +10,17 @@ import {
   FileSpreadsheet,
   Loader2,
   MapPin,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
 import { useAuthContext } from '../components/AuthProvider';
+import { buildLeadSummary, summarizeLeadHistory } from '../lib/leadExport.mjs';
 import { supabase } from '../lib/supabase';
 
 const DATASETS = [
   { id: 'channels', label: 'Canales', description: 'Ficha comercial, contacto, clasificación y evolución', icon: Building2 },
+  { id: 'leads', label: 'Leads', description: 'Registro de leads, estado actual, avances y descartes', icon: UserPlus },
   { id: 'visits', label: 'Visitas', description: 'Historial, resultados, próximos pasos y geolocalización', icon: MapPin },
   { id: 'pipeline', label: 'Pipeline', description: 'Situación y evolución comercial de los canales', icon: BarChart3 },
 ];
@@ -89,6 +92,7 @@ const CHANNEL_FIELDS = [
   { id: 'volume_unit', label: 'Tipo de volumen', group: 'Información comercial', value: row => row.volume_unit || '' },
   { id: 'energy_potential', label: 'Potencial Energía', group: 'Información comercial', value: row => row.potencial_energia || row.potencial_venta_energia || '' },
   { id: 'onboarding_status', label: 'Estado del alta', group: 'Información comercial', value: row => ONBOARDING_LABELS[row.onboarding_status] || row.onboarding_status || '' },
+  { id: 'rejection_reason', label: 'Motivo de descarte', group: 'Información comercial', value: row => row.rejection_reason || '' },
   { id: 'notes', label: 'Notas', group: 'Información comercial', value: row => row.notes || '' },
   { id: 'economic_report', label: 'Informe económico', group: 'Información comercial', value: row => row.informe_economico_name || '' },
   { id: 'caes_type', label: 'Tipo de canal CAEs', group: 'Información CAEs', caesOnly: true, value: row => row.canal_caes_type || row.tipo_canal_caes || '' },
@@ -105,6 +109,35 @@ const CHANNEL_FIELDS = [
   { id: 'updated_at', label: 'Última actualización', group: 'Fechas', value: row => dateLabel(row.updated_at) },
   { id: 'pipeline_stage_changed_at', label: 'Último cambio de fase', group: 'Fechas', value: row => dateLabel(row.pipeline_stage_changed_at) },
   { id: 'onboarding_status_changed_at', label: 'Último avance del alta', group: 'Fechas', value: row => dateLabel(row.onboarding_status_changed_at) },
+];
+
+const LEAD_FIELDS = [
+  { id: 'name', label: 'Lead', group: 'Identificación', value: row => row.name || '' },
+  { id: 'responsible', label: 'Responsable', group: 'Identificación', value: row => row._responsible || '' },
+  { id: 'status', label: 'Estado actual', group: 'Situación actual', value: row => STATUS_LABELS[row.status] || row.status || '' },
+  { id: 'pipeline_stage', label: 'Fase actual', group: 'Situación actual', value: row => STAGE_LABELS[row.pipeline_stage] || row.pipeline_stage || '' },
+  { id: 'days_in_stage', label: 'Días en la fase actual', group: 'Situación actual', value: row => {
+    const changedAt = row._leadHistory?.lastStageChangeAt || row.pipeline_stage_changed_at || row.created_at;
+    return changedAt ? Math.max(0, Math.floor((Date.now() - Date.parse(changedAt)) / 86400000)) : '';
+  } },
+  { id: 'initial_stage', label: 'Fase inicial registrada', group: 'Evolución', value: row => row._leadHistory?.initialStage ? (STAGE_LABELS[row._leadHistory.initialStage] || row._leadHistory.initialStage) : 'Sin historial verificable' },
+  { id: 'highest_stage', label: 'Máxima fase alcanzada', group: 'Evolución', value: row => row._leadHistory?.highestStage ? (STAGE_LABELS[row._leadHistory.highestStage] || row._leadHistory.highestStage) : '' },
+  { id: 'history_available', label: 'Historial de fases disponible', group: 'Evolución', value: row => row._leadHistory?.historyAvailable ? 'Sí' : 'No' },
+  { id: 'has_advanced', label: 'Ha avanzado de fase', group: 'Evolución', value: row => row._leadHistory?.hasAdvanced ? 'Sí' : 'No consta avance' },
+  { id: 'advancement_count', label: 'Número de avances', group: 'Evolución', value: row => row._leadHistory?.advancementCount ?? 0 },
+  { id: 'stage_change_count', label: 'Cambios de fase registrados', group: 'Evolución', value: row => row._leadHistory?.changeCount ?? 0 },
+  { id: 'first_advance_at', label: 'Fecha del primer avance', group: 'Evolución', value: row => dateLabel(row._leadHistory?.firstAdvanceAt) },
+  { id: 'last_stage_change_at', label: 'Fecha del último cambio', group: 'Evolución', value: row => dateLabel(row._leadHistory?.lastStageChangeAt) },
+  { id: 'rejection_reason', label: 'Motivo de descarte', group: 'Cierre', value: row => row.rejection_reason || '' },
+  { id: 'lead_source', label: 'Origen del lead', group: 'Información comercial', value: row => listLabel(row.lead_source, LEAD_SOURCE_LABELS) },
+  { id: 'contact_name', label: 'Persona de contacto', group: 'Contacto', value: row => row.contact_name || '' },
+  { id: 'phone', label: 'Teléfono', group: 'Contacto', value: row => row.phone || '' },
+  { id: 'email', label: 'Correo electrónico', group: 'Contacto', value: row => row.email || '' },
+  { id: 'classification', label: 'Clasificación del canal', group: 'Información comercial', value: row => row._classification || '' },
+  { id: 'city', label: 'Ciudad', group: 'Ubicación', value: row => row.city || '' },
+  { id: 'province', label: 'Provincia', group: 'Ubicación', value: row => row.province || '' },
+  { id: 'created_at', label: 'Fecha de creación', group: 'Fechas', value: row => dateLabel(row.created_at) },
+  { id: 'updated_at', label: 'Última actualización', group: 'Fechas', value: row => dateLabel(row.updated_at) },
 ];
 
 const VISIT_FIELDS = [
@@ -127,13 +160,16 @@ const VISIT_FIELDS = [
 ];
 
 const DEFAULT_FIELDS = {
-  channels: ['name', 'responsible', 'status', 'pipeline_stage', 'classification', 'contact_name', 'phone', 'email', 'city', 'province', 'lead_source', 'volume_amount', 'volume_unit', 'created_at'],
+  channels: ['name', 'responsible', 'status', 'pipeline_stage', 'classification', 'contact_name', 'phone', 'email', 'city', 'province', 'lead_source', 'volume_amount', 'volume_unit', 'rejection_reason', 'created_at'],
+  leads: ['name', 'responsible', 'lead_source', 'status', 'pipeline_stage', 'history_available', 'has_advanced', 'advancement_count', 'highest_stage', 'last_stage_change_at', 'rejection_reason', 'created_at'],
   visits: ['channel', 'responsible', 'date', 'checkin_time', 'checkout_time', 'duration', 'result', 'objective', 'result_notes', 'next_steps'],
-  pipeline: ['name', 'responsible', 'pipeline_stage', 'status', 'classification', 'energy_potential', 'volume_amount', 'volume_unit', 'updated_at', 'pipeline_stage_changed_at'],
+  pipeline: ['name', 'responsible', 'pipeline_stage', 'status', 'classification', 'energy_potential', 'volume_amount', 'volume_unit', 'rejection_reason', 'updated_at', 'pipeline_stage_changed_at'],
 };
 
 function fieldCatalog(type) {
-  return type === 'visits' ? VISIT_FIELDS : CHANNEL_FIELDS;
+  if (type === 'visits') return VISIT_FIELDS;
+  if (type === 'leads') return LEAD_FIELDS;
+  return CHANNEL_FIELDS;
 }
 
 function classificationLabel(item) {
@@ -242,7 +278,30 @@ export default function ExportPage() {
         classificationMap.set(item.channel_id, labels);
       });
     }
-    return rows.map(row => ({ ...row, _responsible: profileNames.get(row.assigned_to) || '', _classification: (classificationMap.get(row.id) || []).join(' · ') }));
+    const baseRows = rows.map(row => ({ ...row, _responsible: profileNames.get(row.assigned_to) || '', _classification: (classificationMap.get(row.id) || []).join(' · ') }));
+    if (type !== 'leads' || !rows.length) return baseRows;
+
+    const history = [];
+    const channelIds = rows.map(row => row.id);
+    for (let offset = 0; offset < channelIds.length; offset += 200) {
+      const { data: historyBatch, error: historyError } = await supabase
+        .from('channel_pipeline_history')
+        .select('channel_id, from_stage, to_stage, created_at')
+        .in('channel_id', channelIds.slice(offset, offset + 200))
+        .order('created_at', { ascending: true });
+      if (historyError) throw historyError;
+      history.push(...(historyBatch || []));
+    }
+    const historyByChannel = new Map();
+    (history || []).forEach(item => {
+      const items = historyByChannel.get(item.channel_id) || [];
+      items.push(item);
+      historyByChannel.set(item.channel_id, items);
+    });
+    return baseRows.map(row => ({
+      ...row,
+      _leadHistory: summarizeLeadHistory(row, historyByChannel.get(row.id) || []),
+    }));
   }
 
   async function loadVisitRows(ownerIds, profileNames) {
@@ -251,7 +310,7 @@ export default function ExportPage() {
     return (data || []).map(row => ({ ...row, _responsible: profileNames.get(row.kam_id) || '' }));
   }
 
-  function saveFile(data, fileName, sheetName) {
+  function saveFile(data, fileName, sheetName, summaryData = null) {
     const worksheet = XLSX.utils.json_to_sheet(data);
     worksheet['!cols'] = Object.keys(data[0]).map(key => ({
       wch: Math.min(60, Math.max(key.length, ...data.slice(0, 100).map(row => String(row[key] ?? '').length)) + 2),
@@ -271,7 +330,26 @@ export default function ExportPage() {
     }
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    if (summaryData) {
+      const summarySheet = XLSX.utils.json_to_sheet(summaryData);
+      summarySheet['!cols'] = [{ wch: 34 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen');
+    }
     XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  }
+
+  function leadSummaryRows(rows) {
+    const summary = buildLeadSummary(rows);
+    return [
+      { Indicador: 'Leads incluidos', Valor: summary.total },
+      { Indicador: 'Leads con avance de fase verificado', Valor: summary.advanced },
+      { Indicador: 'Leads sin avance verificado', Valor: summary.withoutVerifiedAdvance },
+      { Indicador: 'Con historial, pero sin avance', Valor: summary.withHistoryNoAdvance },
+      { Indicador: 'Sin historial de fases disponible', Valor: summary.withoutHistory },
+      { Indicador: 'En proceso de alta o activos', Valor: summary.onboardingOrActive },
+      { Indicador: 'Activos', Valor: summary.active },
+      { Indicador: 'Rechazados o cerrados sin acuerdo', Valor: summary.closed },
+    ];
   }
 
   async function handleExport() {
@@ -293,7 +371,7 @@ export default function ExportPage() {
       const exportData = rows.map(row => Object.fromEntries(fields.map(field => [field.label, field.value(row)])));
       const today = new Date().toISOString().slice(0, 10);
       const datasetName = DATASETS.find(item => item.id === dataset)?.label || 'Datos';
-      saveFile(exportData, `${dataset}_kamapp_${today}`, datasetName);
+      saveFile(exportData, `${dataset}_kamapp_${today}`, datasetName, dataset === 'leads' && format === 'xlsx' ? leadSummaryRows(rows) : null);
       setDone(true);
       const shouldSave = window.confirm('¿Quieres guardar esta selección de campos y formato para la próxima extracción?');
       if (shouldSave) {
@@ -331,7 +409,7 @@ export default function ExportPage() {
         </button>
       </div>
 
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {DATASETS.map(item => {
           const Icon = item.icon;
           const active = dataset === item.id;
@@ -375,6 +453,11 @@ export default function ExportPage() {
         </div>
 
         <div className="p-4">
+          {dataset === 'leads' && (
+            <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] leading-relaxed text-blue-800">
+              Excel incluye una hoja Resumen con el total de leads y los avances de fase verificados. El detalle conserva una fila por lead y señala cuando no existe historial suficiente.
+            </div>
+          )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Campos incluidos</span>
             <div className="flex gap-3 text-[10px] font-semibold">

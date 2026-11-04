@@ -71,6 +71,10 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
     caes_technical_office: channel.caes_technical_office || 'unassigned',
     caes_verifier: channel.caes_verifier || 'unassigned',
     caes_order_number: channel.caes_order_number || '',
+    caes_ot_contact_name: channel.caes_ot_contact_name || '',
+    caes_ot_contact_email: channel.caes_ot_contact_email || '',
+    caes_verifier_contact_name: channel.caes_verifier_contact_name || '',
+    caes_verifier_contact_email: channel.caes_verifier_contact_email || '',
   });
   const [savingField, setSavingField] = useState('');
   const [saved, setSaved] = useState(false);
@@ -86,13 +90,17 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       caes_technical_office: channel.caes_technical_office || 'unassigned',
       caes_verifier: channel.caes_verifier || 'unassigned',
       caes_order_number: channel.caes_order_number || '',
+      caes_ot_contact_name: channel.caes_ot_contact_name || '',
+      caes_ot_contact_email: channel.caes_ot_contact_email || '',
+      caes_verifier_contact_name: channel.caes_verifier_contact_name || '',
+      caes_verifier_contact_email: channel.caes_verifier_contact_email || '',
     });
-  }, [channel.id, channel.onboarding_status, channel.caes_platform, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier, channel.caes_order_number]);
+  }, [channel.id, channel.onboarding_status, channel.caes_platform, channel.caes_role, channel.caes_contract_model, channel.caes_remuneration_tier, channel.caes_technical_office, channel.caes_verifier, channel.caes_order_number, channel.caes_ot_contact_name, channel.caes_ot_contact_email, channel.caes_verifier_contact_name, channel.caes_verifier_contact_email]);
 
   async function updateField(field, value, previousValue) {
     const previous = previousValue === undefined ? values[field] : previousValue;
     const storesPendingAsNull = ['onboarding_status', 'caes_role', 'caes_contract_model', 'caes_remuneration_tier'].includes(field);
-    const normalizedValue = field === 'caes_order_number' ? value.trim() : value;
+    const normalizedValue = field === 'caes_order_number' || field.includes('_contact_') ? value.trim() : value;
     const storedValue = (storesPendingAsNull && normalizedValue === 'pending') || normalizedValue === '' ? null : normalizedValue;
     setValues(current => ({ ...current, [field]: normalizedValue }));
     setSavingField(field);
@@ -140,6 +148,26 @@ export default function ChannelCaesActiveDetails({ channel, onUpdate }) {
       <Field label="Tramo retributivo" value={values.caes_remuneration_tier} options={TIER_OPTIONS} disabled={Boolean(savingField)} onChange={value => updateField('caes_remuneration_tier', value)} />
       <Field label="Oficina técnica" value={values.caes_technical_office} options={TECHNICAL_OFFICES} disabled={Boolean(savingField)} onChange={value => updateField('caes_technical_office', value)} />
       <Field label="Verificador" value={values.caes_verifier} options={VERIFIERS} disabled={Boolean(savingField)} onChange={value => updateField('caes_verifier', value)} />
+      {[
+        ...(values.caes_technical_office !== 'unassigned' ? [
+          ['caes_ot_contact_name', 'Contacto de Oficina Técnica · nombre', 'text'],
+          ['caes_ot_contact_email', 'Contacto de Oficina Técnica · correo', 'email'],
+        ] : []),
+        ['caes_verifier_contact_name', 'Contacto del verificador · nombre', 'text'],
+        ['caes_verifier_contact_email', 'Contacto del verificador · correo', 'email'],
+      ].map(([field, label, type]) => <label key={field} className="block min-w-0">
+        <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">{label}</span>
+        <input type={type} value={values[field]} disabled={Boolean(savingField)} maxLength={type === 'email' ? 254 : 200}
+          onChange={event => setValues(current => ({ ...current, [field]: event.target.value }))}
+          onBlur={event => {
+            if (!event.currentTarget.reportValidity()) return;
+            const previous = channel[field] || '';
+            if (event.target.value.trim() !== previous) updateField(field, event.target.value, previous);
+          }}
+          onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+          placeholder="Pendiente de informar"
+          className="w-full rounded-lg border border-surface-3 bg-white px-3 py-2.5 text-xs font-semibold text-text-primary focus:border-navy-500 focus:outline-none disabled:opacity-60" />
+      </label>)}
       <label className="block min-w-0">
         <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-text-muted">Número de Pedido · obligatorio</span>
         <input type="text" value={values.caes_order_number} disabled={Boolean(savingField)}

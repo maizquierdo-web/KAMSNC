@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from '../components/AuthProvider';
 import { buildLeadSummary, summarizeLeadHistory } from '../lib/leadExport.mjs';
+import { leadOriginGroups } from '../lib/leadSources.mjs';
 import { supabase } from '../lib/supabase';
 
 const DATASETS = [
@@ -70,9 +71,15 @@ function listLabel(value, labels = {}) {
   return labels[value] || value || '';
 }
 
+const LEAD_ORIGIN_FIELD = {
+  id: 'lead_origin', label: 'Tipo de captación (PUSH/PULL)', group: 'Identificación',
+  value: row => leadOriginGroups(row.lead_source).map(group => group.toUpperCase()).join(' + ') || 'Sin definir',
+};
+
 const CHANNEL_FIELDS = [
   { id: 'name', label: 'Nombre', group: 'Identificación', value: row => row.name || '' },
   { id: 'responsible', label: 'Responsable', group: 'Identificación', value: row => row._responsible || '' },
+  LEAD_ORIGIN_FIELD,
   { id: 'status', label: 'Estado', group: 'Identificación', value: row => STATUS_LABELS[row.status] || row.status || '' },
   { id: 'pipeline_stage', label: 'Fase del pipeline', group: 'Identificación', value: row => STAGE_LABELS[row.pipeline_stage] || row.pipeline_stage || '' },
   { id: 'classification', label: 'Clasificación del canal', group: 'Identificación', value: row => row._classification || '' },
@@ -114,6 +121,7 @@ const CHANNEL_FIELDS = [
 const LEAD_FIELDS = [
   { id: 'name', label: 'Lead', group: 'Identificación', value: row => row.name || '' },
   { id: 'responsible', label: 'Responsable', group: 'Identificación', value: row => row._responsible || '' },
+  LEAD_ORIGIN_FIELD,
   { id: 'status', label: 'Estado actual', group: 'Situación actual', value: row => STATUS_LABELS[row.status] || row.status || '' },
   { id: 'pipeline_stage', label: 'Fase actual', group: 'Situación actual', value: row => STAGE_LABELS[row.pipeline_stage] || row.pipeline_stage || '' },
   { id: 'days_in_stage', label: 'Días en la fase actual', group: 'Situación actual', value: row => {
@@ -160,10 +168,10 @@ const VISIT_FIELDS = [
 ];
 
 const DEFAULT_FIELDS = {
-  channels: ['name', 'responsible', 'status', 'pipeline_stage', 'classification', 'contact_name', 'phone', 'email', 'city', 'province', 'lead_source', 'volume_amount', 'volume_unit', 'rejection_reason', 'created_at'],
-  leads: ['name', 'responsible', 'lead_source', 'status', 'pipeline_stage', 'history_available', 'has_advanced', 'advancement_count', 'highest_stage', 'last_stage_change_at', 'rejection_reason', 'created_at'],
+  channels: ['name', 'responsible', 'lead_origin', 'status', 'pipeline_stage', 'classification', 'contact_name', 'phone', 'email', 'city', 'province', 'lead_source', 'volume_amount', 'volume_unit', 'rejection_reason', 'created_at'],
+  leads: ['name', 'responsible', 'lead_origin', 'lead_source', 'status', 'pipeline_stage', 'history_available', 'has_advanced', 'advancement_count', 'highest_stage', 'last_stage_change_at', 'rejection_reason', 'created_at'],
   visits: ['channel', 'responsible', 'date', 'checkin_time', 'checkout_time', 'duration', 'result', 'objective', 'result_notes', 'next_steps'],
-  pipeline: ['name', 'responsible', 'pipeline_stage', 'status', 'classification', 'energy_potential', 'volume_amount', 'volume_unit', 'rejection_reason', 'updated_at', 'pipeline_stage_changed_at'],
+  pipeline: ['name', 'responsible', 'lead_origin', 'pipeline_stage', 'status', 'classification', 'energy_potential', 'volume_amount', 'volume_unit', 'rejection_reason', 'updated_at', 'pipeline_stage_changed_at'],
 };
 
 function fieldCatalog(type) {

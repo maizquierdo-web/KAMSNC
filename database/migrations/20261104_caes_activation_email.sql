@@ -73,7 +73,7 @@ BEGIN
   ) VALUES (
     NEW.id, v_actor_id, txid_current(), v_actor_email,
     'Canal activado · ' || replace(replace(NEW.name, chr(13), ' '), chr(10), ' ') || ' · Completar datos técnicos',
-    format(E'Hola, Marina:\n\n%s ha pasado el canal %s a estado Activo.\n\nPor favor, completa en su ficha la Oficina Técnica, cuando corresponda, y el verificador, junto con el nombre y correo de sus contactos.\n\nGracias.', v_actor_name, NEW.name),
+    format(E'Hola, Marina:\n\n%s ha pasado el canal %s a estado Activo.\n\nPor favor, completa en su ficha la Oficina Técnica, cuando corresponda, y el verificador. Informa el nombre y correo del contacto de Oficina Técnica si tiene OT asignada.%s\n\nGracias.', v_actor_name, NEW.name, CASE WHEN NEW.caes_role = 'promoter_ot' THEN E'\nAl tener rol Promotor + OT, informa también el nombre y correo del contacto del verificador.' ELSE '' END),
     CASE WHEN v_actor_email IS NULL THEN 'blocked' ELSE 'pending' END,
     CASE WHEN v_actor_email IS NULL THEN 'El usuario que activa el canal no tiene correo de autenticación disponible.' END
   ) ON CONFLICT (channel_id, activation_transaction) DO NOTHING;

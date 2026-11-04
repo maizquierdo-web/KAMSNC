@@ -11,6 +11,10 @@
 - Cuatro campos opcionales: nombre/correo del contacto de OT y nombre/correo del
   verificador. La ficha muestra los de OT cuando hay oficina asignada. Conservan
   los permisos existentes, incluidos los de Marina, y no bloquean activación.
+  El contacto del verificador solo se solicita para el rol Promotor + OT
+  (promoter_ot), también en el aviso a Marina. No se borra al cambiar de rol.
+  Pendiente recibir el catálogo de contactos para sustituir los textos por dos
+  desplegables (OT y verificador), completando nombre y correo al seleccionar.
 - Conserva la notificación interna existente de la campana.
 
 ## Despliegue

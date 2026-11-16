@@ -1,5 +1,6 @@
 // Shared by the editor, pipeline and RVC: preserve the stored free-text suffix.
 export const LEAD_SOURCE_OPTIONS = [
+  { value: 'anerr', label: 'ANERR', group: 'push' },
   { value: 'recomendacion_partner', label: 'Recomendación partner', group: 'pull' },
   { value: 'industrial', label: 'Industrial', group: 'pull' },
   { value: 'generacion_distribuida', label: 'Generación Distribuida', group: 'pull' },

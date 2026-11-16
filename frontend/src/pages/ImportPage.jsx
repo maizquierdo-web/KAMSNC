@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { isoAnerrDate, useAnerrAccess } from '../lib/anerr';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
 import * as XLSX from 'xlsx';
@@ -30,6 +31,13 @@ const CHANNEL_FIELDS = [
   { key: 'city', label: 'Localidad', required: false },
   { key: 'province', label: 'Provincia', required: false },
   { key: 'notes', label: 'Notas', required: false },
+];
+
+const ANERR_FIELDS = [
+  { key: 'anerr_delegate', label: 'Delegado ANERR' },
+  { key: 'anerr_territory', label: 'Territorio' },
+  { key: 'anerr_alias', label: 'Alias' },
+  { key: 'anerr_presented_on', label: 'Fecha de presentación ANERR' },
 ];
 
 // Campos de Origen del lead: una columna Excel por cada origen posible (Sí/No),
@@ -94,7 +102,7 @@ async function parseFile(file) {
 }
 
 // ============ STEP 1: FILE UPLOAD ============
-function FileUploadStep({ onFileParsed }) {
+function FileUploadStep({ onFileParsed, anerr }) {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -163,7 +171,9 @@ function FileUploadStep({ onFileParsed }) {
       },
     ];
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = anerr
+      ? XLSX.utils.aoa_to_sheet([[...Object.keys(data[0]).filter(key => key !== 'Fase del Pipeline' && !key.startsWith('Origen:')), ...ANERR_FIELDS.map(field => field.label)]])
+      : XLSX.utils.json_to_sheet(data);
     // Ancho de columna razonable para todas; las de Origen son más estrechas
     const baseCols = 13; // columnas "normales" antes de los orígenes
     const cols = Object.keys(data[0]).map((_, i) => (i < baseCols ? { wch: 20 } : { wch: 14 }));
@@ -184,7 +194,7 @@ function FileUploadStep({ onFileParsed }) {
     wsHelp['!cols'] = [{ wch: 30 }, { wch: 60 }, { wch: 45 }];
     XLSX.utils.book_append_sheet(wb, wsHelp, 'Ayuda - valores válidos');
 
-    XLSX.writeFile(wb, 'plantilla_canales_kamapp.xlsx');
+    XLSX.writeFile(wb, anerr ? 'plantilla_canales_anerr.xlsx' : 'plantilla_canales_kamapp.xlsx');
   };
 
   return (
@@ -237,6 +247,7 @@ function FileUploadStep({ onFileParsed }) {
       <div className="mt-5 bg-surface-1 border border-surface-3 rounded-xl p-4">
         <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Cómo preparar tu Excel</h3>
         <div className="text-xs text-text-muted space-y-1.5">
+          {anerr && <p>Indica la fecha de presentación solo cuando el delegado haya confirmado el interés y la presentación dé lugar a gestión comercial. Las fichas nuevas entran en fase Lead.</p>}
           <p>1. Descarga la <strong>plantilla Excel</strong> con el botón de arriba (incluye una hoja de ayuda con los valores válidos)</p>
           <p>2. Rellena los datos de tus canales (uno por fila)</p>
           <p>3. La columna <strong>Nombre</strong> es obligatoria, el resto son opcionales</p>
@@ -252,7 +263,7 @@ function FileUploadStep({ onFileParsed }) {
 }
 
 // ============ STEP 2: COLUMN MAPPING ============
-function MappingStep({ fileData, onMapped, onBack }) {
+function MappingStep({ fileData, onMapped, onBack, anerr }) {
   const { headers, rows, sheetName, totalSheets } = fileData;
 
   const [mapping, setMapping] = useState(() => {
@@ -261,6 +272,12 @@ function MappingStep({ fileData, onMapped, onBack }) {
 
     headers.forEach(h => {
       const n = normalize(h);
+      if (anerr) {
+        const field = ANERR_FIELDS.find(field => n === normalize(field.label));
+        if (field) { autoMap[h] = field.key; return; }
+        if (n === 'razonsocial') { autoMap[h] = 'name'; return; }
+        if (n === 'fechadepresentacion') { autoMap[h] = 'anerr_presented_on'; return; }
+      }
 
       // Detectar columnas de origen del lead ("Origen: X") por coincidencia exacta de label
       const leadMatch = LEAD_SOURCE_FIELDS.find(f => n === normalize(`Origen: ${LEAD_SOURCE_OPTIONS.find(o => o.value === f.leadSourceValue)?.label || ''}`));
@@ -339,7 +356,7 @@ function MappingStep({ fileData, onMapped, onBack }) {
                 }`}>
                 <option value="">— No importar —</option>
                 <optgroup label="Datos del canal">
-                  {CHANNEL_FIELDS.map(f => {
+                  {[...CHANNEL_FIELDS, ...(anerr ? ANERR_FIELDS : [])].map(f => {
                     const usedBy = Object.entries(mapping).find(([k, v]) => v === f.key && k !== header);
                     return (
                       <option key={f.key} value={f.key} disabled={!!usedBy}>
@@ -429,9 +446,22 @@ function PreviewStep({ rows, mapping, onImport, onBack, importing, result }) {
         <p className="text-xs text-text-muted mb-6">
           Recuerda asignar la clasificación detallada (Energia/Solar/CAEs &gt; subtipo) desde la ficha de cada canal
         </p>
-        <button onClick={() => window.location.href = '/channels'}
+        {result.outcomes.length > 0 && (
+          <ul className="mb-4 max-h-72 overflow-auto text-sm text-left">
+            {result.outcomes.map(({ name, outcome }, index) => (
+              <li key={index} className="py-1">{name} · {{
+                created: 'Nuevo canal ANERR', linked: 'Cuenta existente vinculada como ORIGEN ANERR',
+                updated: 'Vínculo actualizado', excluded: 'Excluido por estar en alta o activo',
+                awaiting: 'Cuenta existente pendiente de presentación',
+                ambiguous: 'Varias coincidencias, revisar CIF y nombre',
+                invalid: 'Revisar nombre o fecha de presentación', error: 'Error al guardar',
+              }[outcome] || 'Revisar resultado'}</li>
+            ))}
+          </ul>
+        )}
+        <button onClick={() => window.location.href = result.outcomes.length ? '/pipeline?anerr=1' : '/channels'}
           className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl transition-colors">
-          Ver mis canales
+          {result.outcomes.length ? 'Ver seguimiento ANERR' : 'Ver mis canales'}
         </button>
       </div>
     );
@@ -517,6 +547,8 @@ function PreviewStep({ rows, mapping, onImport, onBack, importing, result }) {
 // ============ MAIN PAGE ============
 export default function ImportPage() {
   const { user } = useAuthContext();
+  const canUseAnerr = useAnerrAccess(user?.id);
+  const [anerr, setAnerr] = useState(false);
   const [step, setStep] = useState('upload');
   const [fileData, setFileData] = useState(null);
   const [mapping, setMapping] = useState({});
@@ -530,10 +562,12 @@ export default function ImportPage() {
     setImporting(true);
     let success = 0;
     let errors = 0;
+    const outcomes = [];
 
     const chunkSize = 50;
     for (let i = 0; i < rows.length; i += chunkSize) {
-      const chunk = rows.slice(i, i + chunkSize).map(row => ({
+      const source = rows.slice(i, i + chunkSize);
+      const chunk = source.map(row => ({
         name: row.name,
         contact_name: row.contact_name || null,
         phone: row.phone || null,
@@ -556,6 +590,25 @@ export default function ImportPage() {
         assigned_to: user.id,
       }));
 
+      if (anerr) {
+        for (const [index, record] of chunk.entries()) {
+          const row = source[index];
+          const date = isoAnerrDate(row.anerr_presented_on, XLSX.SSF.parse_date_code);
+          let outcome = 'invalid';
+          if (!row.anerr_presented_on || date) {
+            const { data, error } = await supabase.rpc('anerr_import', { payload: {
+              ...record, anerr_presented_on: date, anerr_delegate: row.anerr_delegate,
+              anerr_territory: row.anerr_territory, anerr_alias: row.anerr_alias,
+            } });
+            outcome = error ? 'error' : data;
+          }
+          if (['created', 'linked', 'updated'].includes(outcome)) success++;
+          else if (['error', 'invalid', 'ambiguous'].includes(outcome)) errors++;
+          outcomes.push({ name: record.name, outcome });
+        }
+        continue;
+      }
+
       try {
         const { data, error } = await supabase.from('channels').insert(chunk).select();
         if (error) throw error;
@@ -566,7 +619,7 @@ export default function ImportPage() {
       }
     }
 
-    setResult({ success, errors });
+    setResult({ success, errors, outcomes });
     setImporting(false);
   }
 
@@ -591,9 +644,14 @@ export default function ImportPage() {
         </div>
       )}
 
-      {step === 'upload' && <FileUploadStep onFileParsed={handleFileParsed} />}
+      {step === 'upload' && canUseAnerr && (
+        <label className="flex items-center gap-2 mb-4 text-sm font-semibold">
+          <input type="checkbox" checked={anerr} onChange={event => setAnerr(event.target.checked)} /> Carga ANERR
+        </label>
+      )}
+      {step === 'upload' && <FileUploadStep onFileParsed={handleFileParsed} anerr={anerr} />}
       {step === 'mapping' && fileData && (
-        <MappingStep fileData={fileData} onMapped={handleMapped} onBack={() => setStep('upload')} />
+        <MappingStep anerr={anerr} fileData={fileData} onMapped={handleMapped} onBack={() => setStep('upload')} />
       )}
       {step === 'preview' && fileData && (
         <PreviewStep rows={fileData.rows} mapping={mapping} onImport={handleImport}

@@ -517,7 +517,7 @@ export default function PipelinePage() {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, zone, role')
-        .eq('role', 'kam')
+        .or('role.eq.kam,full_name.ilike.Claudia,full_name.ilike.Claudia *')
         .eq('is_active', true)
         .order('full_name');
       setTeamKams(data || []);

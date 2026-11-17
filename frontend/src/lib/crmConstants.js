@@ -79,6 +79,16 @@ export const ACTIVE_PIPELINE_STAGES = ['first_contact', 'proposal', 'negotiation
 export const TERMINAL_STAGES        = ['active', 'closed_no_deal'];
 export const INITIAL_STAGE          = 'lead';
 
+export const STATUS_TO_DEFAULT_STAGE = {
+  pendiente_contacto: 'lead',
+  en_desarrollo:       'first_contact',
+  en_evaluacion:        'negotiation',
+  en_proceso_alta:     'onboarding',
+  activo:              'active',
+  rechazado:           'closed_no_deal',
+  cierre_sin_acuerdo:  'closed_no_deal',
+};
+
 // ============ stage -> status (única fuente de verdad, usada en todo el CRM) ============
 export function stageToStatus(stage) {
   if (stage === 'active')         return 'activo';

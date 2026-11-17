@@ -75,6 +75,13 @@ function CifInlineEditor({ channel, onChannelUpdate }) {
 }
 
 export default function CompanyAnalysis({ channel, onChannelUpdate }) {
+  const companyName = channel?.name?.trim() || '';
+  const datosCifSlug = companyName.toLowerCase().normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\b(s)\.\s*(l|a)\.?(?=\s|$)/g, '$1$2')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
   const { user } = useAuthContext();
   const [expanded, setExpanded] = useState(false);
   const [analysis, setAnalysis] = useState(null);
@@ -320,14 +327,14 @@ Sé concreto y práctico. Si faltan datos, indícalo claramente y ajusta el scor
         </div>
 
         <div className="space-y-2">
-          {channel?.name?.trim() && (
-            <a href={`https://www.google.com/search?${new URLSearchParams({ q: `site:datoscif.es/empresa/ ${channel.name.trim()}` })}`}
+          {datosCifSlug && (
+            <a href={`https://www.datoscif.es/empresa/${datosCifSlug}`}
               target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-2 p-2.5 bg-navy-50 border border-navy-100 rounded-lg hover:bg-navy-100 transition-colors">
               <ExternalLink size={14} className="text-navy-500 flex-shrink-0" />
               <div className="flex-1">
-                <div className="text-xs font-semibold text-navy-700">Buscar empresa en DatosCIF.es</div>
-                <div className="text-[10px] text-navy-500">{channel.name.trim()}</div>
+                <div className="text-xs font-semibold text-navy-700">Consultar en DatosCIF.es</div>
+                <div className="text-[10px] text-navy-500">{companyName}</div>
               </div>
             </a>
           )}

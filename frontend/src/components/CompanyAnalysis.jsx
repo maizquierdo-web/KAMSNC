@@ -10,8 +10,8 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 const STATUS_LABELS = {
   pendiente_contacto: 'Pendiente contacto',
-  en_desarrollo:      'En desarrollo',
-  en_evaluacion:      'En evaluación',
+  en_desarrollo:      'Contactado',
+  en_evaluacion:      'En negociación',
   en_proceso_alta:    'En proceso de alta',
   activo:             'Activo',
   rechazado:          'Rechazado',
@@ -135,7 +135,7 @@ Criterios de scoring:
 - Dirección completa: +10 pts
 - Contacto identificado: +10 pts
 - Informe económico adjunto: +20 pts
-- Estado activo o en desarrollo: +10 pts
+- Estado activo o contactado: +10 pts
 - Pipeline avanzado (propuesta o superior): +10 pts
 - Tipo de canal CAES especificado: +5 pts
 - Potencial CAES Alto o Muy Alto: +5 pts

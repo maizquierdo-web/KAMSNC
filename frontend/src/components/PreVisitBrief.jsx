@@ -7,8 +7,8 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 const STATUS_LABELS = {
   pendiente_contacto: 'Pendiente contacto',
-  en_desarrollo:      'En desarrollo',
-  en_evaluacion:      'En evaluación',
+  en_desarrollo:      'Contactado',
+  en_evaluacion:      'En negociación',
   en_proceso_alta:    'En proceso de alta',
   activo:             'Activo',
   rechazado:          'Rechazado',

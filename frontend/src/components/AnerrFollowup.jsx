@@ -91,7 +91,7 @@ export default function AnerrFollowup({ onChannelClick }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-surface-3 bg-white p-3 sm:p-4">
         <label className="grid gap-1 text-xs">Vínculo
           <select className="border rounded p-2" value={link} onChange={event => setLink(event.target.value)}>
             <option value="">Todos</option>{LINKS.map(value => <option key={value}>{value}</option>)}
@@ -102,33 +102,64 @@ export default function AnerrFollowup({ onChannelClick }) {
             {FILTERS.map(([label], index) => <option key={label} value={index}>{label}</option>)}
           </select>
         </label>
-        <button type="button" className="border rounded p-2 text-xs" disabled={!validRange} onClick={() => exportRows('xlsx')}>Exportar Excel</button>
-        <button type="button" className="border rounded p-2 text-xs" onClick={() => exportRows('csv')}>Exportar CSV</button>
+        <button type="button" className="rounded-lg bg-navy-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50" disabled={!validRange} onClick={() => exportRows('xlsx')}>Exportar Excel</button>
+        <button type="button" className="rounded-lg border border-navy-100 px-3 py-2 text-xs font-bold text-navy-700" onClick={() => exportRows('csv')}>Exportar CSV</button>
       </div>
-      <section className="rounded-xl border border-surface-3 p-3 space-y-2">
-        <h2 className="text-sm font-bold">Revisión quincenal</h2>
+      <section className="space-y-3 rounded-xl border border-surface-3 bg-white p-3 sm:p-4">
+        <h2 className="text-base font-extrabold">Revisión quincenal</h2>
         <div className="flex flex-wrap gap-3">
           <label className="grid gap-1 text-xs">Desde <input className="border rounded p-1" type="date" value={from} onChange={event => setFrom(event.target.value)} /></label>
           <label className="grid gap-1 text-xs">Hasta <input className="border rounded p-1" type="date" value={to} onChange={event => setTo(event.target.value)} /></label>
         </div>
         {!validRange ? <p className="text-sm text-red-600">Introduce un intervalo válido.</p> : (
-          <table className="text-xs">
-            <thead><tr><th className="text-left pr-4">Hito</th>{LINKS.map(value => <th key={value} className="px-3">{value}</th>)}</tr></thead>
-            <tbody>{summary.map(([label, ...counts]) => <tr key={label}><th scope="row" className="text-left pr-4 py-1 font-normal">{label}</th>{counts.map((count, index) => <td key={LINKS[index]} className="text-center">{count}</td>)}</tr>)}</tbody>
-          </table>
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+            {summary.map(([label, ...counts]) => (
+              <article key={label} className="rounded-xl border border-navy-100 bg-navy-50 p-3">
+                <h3 className="text-xs font-bold text-navy-700">{label}</h3>
+                <p className="my-1 text-2xl font-extrabold text-navy-700">{counts.reduce((sum, count) => sum + count, 0)}</p>
+                <dl className="space-y-1 text-[11px] text-text-secondary">
+                  {LINKS.map((value, index) => (
+                    <div key={value} className="flex flex-wrap justify-between gap-x-2">
+                      <dt>{value}</dt><dd className="font-bold tabular-nums">{counts[index]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))}
+          </div>
         )}
       </section>
-      <p className="text-xs text-text-secondary">{visible.length} canales</p>
-      <div className="overflow-x-auto rounded-xl border border-surface-3">
-        <table className="w-full text-xs whitespace-nowrap">
-          <thead><tr>{COLUMNS.map(([label]) => <th key={label} className="p-2 text-left bg-surface-2">{label}</th>)}</tr></thead>
-          <tbody>{visible.map(row => <tr key={row.id} className="border-t border-surface-3">
-            {COLUMNS.map(([label, value], index) => <td key={label} className="p-2">
-              {index === 0 ? <button type="button" className="font-bold underline" onClick={() => onChannelClick(row.id)}>{row.name}</button> : value(row) || '—'}
-            </td>)}
-          </tr>)}</tbody>
-        </table>
-      </div>
+      <section className="space-y-2">
+        <h2 className="text-sm font-extrabold">Canales ({visible.length})</h2>
+        {visible.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-surface-3 bg-white p-6 text-sm text-text-secondary">
+            {rows.length ? 'Ningún canal coincide con estos filtros.' : 'Todavía no hay canales vinculados a ANERR. Puedes etiquetarlos desde su ficha o importarlos desde Excel.'}
+          </div>
+        ) : (
+          <div className="grid gap-2 lg:grid-cols-2">
+            {visible.map(row => (
+              <article key={row.id} className="rounded-xl border border-surface-3 bg-white p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <button type="button" className="text-left text-sm font-bold text-navy-700 hover:underline" onClick={() => onChannelClick(row.id)}>{row.name}</button>
+                  <span className="rounded-full bg-navy-50 px-2 py-1 text-[10px] font-bold text-navy-700">{row.anerr_link}</span>
+                </div>
+                <p className="mt-1 text-xs text-text-secondary">{[row.responsible, state(row), PIPELINE_CONFIG[row.stage] || row.stage].filter(Boolean).join(' · ')}</p>
+                <p className="mt-2 text-xs font-semibold">
+                  {row.action_on ? [row.action || 'Próxima acción', row.action_on].join(' · ') : 'Sin próxima acción'}
+                </p>
+                <details className="mt-2 text-xs text-text-secondary">
+                  <summary className="cursor-pointer font-semibold">Ver hitos y datos del canal</summary>
+                  <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                    {COLUMNS.slice(2).map(([label, value]) => value(row) && (
+                      <div key={label}><dt className="inline font-semibold">{label} </dt><dd className="inline">{value(row)}</dd></div>
+                    ))}
+                  </dl>
+                </details>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

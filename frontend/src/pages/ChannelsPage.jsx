@@ -1,3 +1,4 @@
+import { useAnerrAccess } from '../lib/anerr';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -256,6 +257,11 @@ function ChannelList({ channels, loading, onSelect, filter, setFilter, search, s
 // ============ DETALLE DE CANAL ============
 function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const { user } = useAuthContext();
+  const canUseAnerr = useAnerrAccess(user?.id);
+  const [anerrEditing, setAnerrEditing] = useState(false);
+  const [anerrValue, setAnerrValue] = useState('');
+  const [anerrSaving, setAnerrSaving] = useState(false);
+  const [anerrError, setAnerrError] = useState('');
   const [channel, setChannel] = useState(null);
   const [classifications, setClassifications] = useState([]);
   const [editClassifications, setEditClassifications] = useState([]);
@@ -271,6 +277,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   const [hunterOpen, setHunterOpen] = useState(false);
 
   useEffect(() => {
+    setAnerrEditing(false);
+    setAnerrError('');
     loadChannel();
   }, [channelId]);
 
@@ -332,6 +340,25 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       anerr_link: ch?.anerr_link || '',
       ...Object.fromEntries(ANERR_DETAIL_FIELDS.map(([key]) => [key, ch?.[key] || ''])),
     });
+  }
+
+  async function saveAnerrLabel() {
+    setAnerrSaving(true);
+    setAnerrError('');
+    try {
+      const { data, error } = await supabase.from('channels')
+        .update({ anerr_link: anerrValue || null })
+        .eq('id', channelId)
+        .select('id, anerr_link')
+        .single();
+      if (error) throw error;
+      setChannel(current => current?.id === data.id ? { ...current, anerr_link: data.anerr_link } : current);
+      setAnerrEditing(false);
+    } catch {
+      setAnerrError('No se pudo guardar la etiqueta. Comprueba que puedes editar este canal.');
+    } finally {
+      setAnerrSaving(false);
+    }
   }
 
   function startEdit() {
@@ -438,8 +465,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           pipeline_stage: editForm.pipeline_stage,
           status: stageToStatus(editForm.pipeline_stage),
           ...(stageChanged ? { pipeline_stage_changed_at: now } : {}),
-          ...(editForm.anerr_link !== (channel.anerr_link || '') ? { anerr_link: editForm.anerr_link || null } : {}),
-          ...(editForm.anerr_link ? Object.fromEntries(ANERR_DETAIL_FIELDS.filter(([key]) => editForm[key] !== (channel[key] || '')).map(([key]) => [key, editForm[key]?.trim() || null])) : {}),
+          ...(canUseAnerr && editForm.anerr_link !== (channel.anerr_link || '') ? { anerr_link: editForm.anerr_link || null } : {}),
+          ...(canUseAnerr && editForm.anerr_link ? Object.fromEntries(ANERR_DETAIL_FIELDS.filter(([key]) => editForm[key] !== (channel[key] || '')).map(([key]) => [key, editForm[key]?.trim() || null])) : {}),
           notes: editForm.notes || null,
           rejection_reason: editForm.pipeline_stage === 'closed_no_deal' ? (editForm.rejection_reason || null) : null,
         })
@@ -500,9 +527,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         ← Canales
       </button>
 
-      {channel.anerr_link && (
+      {canUseAnerr && channel.anerr_link && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs">
-          <strong className="text-brand-600">{channel.anerr_link}</strong>
           {channel.anerr_delegate && <span>Delegado: {channel.anerr_delegate}</span>}
           {channel.anerr_territory && <span>Territorio: {channel.anerr_territory}</span>}
           {channel.anerr_presented_on && <span>Presentación: {channel.anerr_presented_on}</span>}
@@ -527,7 +553,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm focus:outline-none focus:border-brand-500" />
               </div>
 
-              <label className="grid gap-1 text-xs font-semibold">
+              {canUseAnerr && <label className="grid gap-1 text-xs font-semibold">
                 Etiqueta ANERR
                 <select value={editForm.anerr_link ?? ''} onChange={event => updateField('anerr_link', event.target.value)}
                   className="border border-surface-3 bg-white rounded-lg px-3 py-2 text-sm">
@@ -539,8 +565,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                     ORIGEN ANERR
                   </option>
                 </select>
-              </label>
-              {editForm.anerr_link && (
+              </label>}
+              {canUseAnerr && editForm.anerr_link && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {ANERR_DETAIL_FIELDS.map(([key, label, type]) => (
                     <label key={key} className="grid gap-1 text-xs font-semibold">
@@ -708,6 +734,17 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                       {pipeline}
                     </span>
                   )}
+                  {canUseAnerr && (
+                    <button type="button" aria-expanded={anerrEditing}
+                      className="rounded-full border border-navy-100 bg-navy-50 px-2.5 py-1 text-xs font-bold text-navy-700 hover:bg-navy-100"
+                      onClick={() => {
+                        setAnerrValue(channel.anerr_link || '');
+                        setAnerrError('');
+                        setAnerrEditing(!anerrEditing);
+                      }}>
+                      {channel.anerr_link || '+ Etiqueta ANERR'}
+                    </button>
+                  )}
                 </div>
               </div>
               <button type="button" disabled={hunterOpen} onClick={() => setCopilotOpen(true)}
@@ -744,6 +781,30 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {canUseAnerr && anerrEditing && (
+              <div className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-navy-100 bg-navy-50 p-3">
+                <label className="grid gap-1 text-xs font-bold text-navy-700">
+                  Etiqueta ANERR
+                  <select value={anerrValue} disabled={anerrSaving} onChange={event => setAnerrValue(event.target.value)}
+                    className="rounded-lg border border-navy-100 bg-white px-2.5 py-2 text-sm">
+                    <option value="">Sin etiqueta</option>
+                    <option value="ANERR">ANERR</option>
+                    <option value="ORIGEN ANERR" disabled={channel.anerr_link !== 'ORIGEN ANERR' &&
+                      (['activo', 'en_proceso_alta'].includes(channel.status) || ['active', 'onboarding'].includes(channel.pipeline_stage))}>
+                      ORIGEN ANERR
+                    </option>
+                  </select>
+                </label>
+                <button type="button" disabled={anerrSaving || anerrValue === (channel.anerr_link || '')}
+                  onClick={saveAnerrLabel} className="rounded-lg bg-navy-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {anerrSaving ? 'Guardando…' : 'Guardar etiqueta'}
+                </button>
+                <button type="button" disabled={anerrSaving} onClick={() => setAnerrEditing(false)}
+                  className="rounded-lg px-3 py-2 text-xs font-bold text-navy-700">Cancelar</button>
+                {anerrError && <p role="alert" className="w-full text-xs text-red-600">{anerrError}</p>}
               </div>
             )}
 

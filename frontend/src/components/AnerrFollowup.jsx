@@ -79,12 +79,6 @@ export default function AnerrFollowup({ onChannelClick }) {
 
   if (error) return <p role="alert" className="text-red-600">{error}</p>;
   if (!rows) return <p className="text-sm text-text-secondary">Cargando seguimiento ANERR…</p>;
-  if (!rows.length) return (
-    <p className="rounded-xl border border-dashed border-surface-3 bg-white p-5 text-sm text-text-secondary">
-      Todavía no hay canales vinculados a ANERR. Etiqueta un canal desde su ficha o importa el listado desde Excel.
-    </p>
-  );
-
   const today = dateKey(new Date());
   const portfolio = rows.filter(row => !link || row.anerr_link === link);
   const counts = FILTERS.map(([, test]) => portfolio.filter(row => test(row, today)).length);
@@ -174,7 +168,11 @@ export default function AnerrFollowup({ onChannelClick }) {
           ))}
         </div>
         {!visible.length ? (
-          <p className="rounded-xl border border-dashed border-surface-3 bg-white p-4 text-sm text-text-secondary">Ningún canal coincide con estos filtros.</p>
+          <p className="rounded-xl border border-dashed border-surface-3 bg-white p-4 text-sm text-text-secondary">
+            {rows.length
+              ? 'Ningún canal coincide con estos filtros.'
+              : 'Todavía no hay canales vinculados a ANERR. Etiqueta un canal desde su ficha o importa el listado desde Excel.'}
+          </p>
         ) : (
           <ul className="divide-y divide-surface-3 rounded-xl border border-surface-3 bg-white">
             {visible.map(row => {

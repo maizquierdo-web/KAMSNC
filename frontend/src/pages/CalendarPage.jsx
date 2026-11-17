@@ -615,7 +615,7 @@ export default function CalendarPage() {
   async function loadTeamKams() {
     const { data } = await supabase.from('profiles')
       .select('id, full_name, zone').eq('is_active', true)
-      .in('role', ['kam', 'coordinator']).order('full_name');
+      .or('role.in.(kam,coordinator),full_name.ilike.Claudia,full_name.ilike.Claudia *').order('full_name');
     setTeamKams(data || []);
   }
 

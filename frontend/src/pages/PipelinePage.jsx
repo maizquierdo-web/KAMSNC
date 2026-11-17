@@ -581,7 +581,7 @@ export default function PipelinePage() {
     const channel = channels.find(c => c.id === channelId);
     if (!channel || channel.status === newStatusKey) return;
 
-    const requirements = pipelineRequirementsMessage(channel);
+    const requirements = pipelineRequirementsMessage(channel, newStatusKey);
     if (requirements) {
       setDraggingId(null);
       setToast({ message: requirements, color: '#ef4444', duration: 8500 });

@@ -434,7 +434,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       return;
     }
     const statusChanged = editForm.status !== (STATUS_CONFIG[channel.status] ? channel.status : stageToStatus(channel.pipeline_stage));
-    const requirements = statusChanged ? pipelineRequirementsMessage(channel) : '';
+    const requirements = statusChanged ? pipelineRequirementsMessage(channel, editForm.status) : '';
     if (requirements) {
       setEditError(requirements);
       return;

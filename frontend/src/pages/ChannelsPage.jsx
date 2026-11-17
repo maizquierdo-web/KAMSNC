@@ -32,6 +32,13 @@ import {
   ChevronRight, User, X, Check, Loader2, Edit3, Upload, ArrowRightLeft, Sparkles
 } from 'lucide-react';
 
+const ANERR_DETAIL_FIELDS = [
+  ['anerr_delegate', 'Delegado ANERR', 'text'],
+  ['anerr_territory', 'Territorio', 'text'],
+  ['anerr_alias', 'Alias', 'text'],
+  ['anerr_presented_on', 'Fecha de presentación', 'date'],
+];
+
 // ============ MULTISELECT ORIGEN DEL LEAD (checkboxes) ============
 function LeadSourceCheckboxes({ value = [], onChange, otherText = '', onOtherTextChange }) {
   // value contiene los keys seleccionados (ej. ['industrial', 'kam', 'otros'])
@@ -322,6 +329,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       pipeline_stage: ch?.pipeline_stage || 'lead',
       notes: ch?.notes || '',
       rejection_reason: ch?.rejection_reason || '',
+      anerr_link: ch?.anerr_link || '',
+      ...Object.fromEntries(ANERR_DETAIL_FIELDS.map(([key]) => [key, ch?.[key] || ''])),
     });
   }
 
@@ -429,6 +438,8 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           pipeline_stage: editForm.pipeline_stage,
           status: stageToStatus(editForm.pipeline_stage),
           ...(stageChanged ? { pipeline_stage_changed_at: now } : {}),
+          ...(editForm.anerr_link !== (channel.anerr_link || '') ? { anerr_link: editForm.anerr_link || null } : {}),
+          ...(editForm.anerr_link ? Object.fromEntries(ANERR_DETAIL_FIELDS.filter(([key]) => editForm[key] !== (channel[key] || '')).map(([key]) => [key, editForm[key]?.trim() || null])) : {}),
           notes: editForm.notes || null,
           rejection_reason: editForm.pipeline_stage === 'closed_no_deal' ? (editForm.rejection_reason || null) : null,
         })
@@ -489,6 +500,14 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
         ← Canales
       </button>
 
+      {channel.anerr_link && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-3 text-xs">
+          <strong className="text-brand-600">{channel.anerr_link}</strong>
+          {channel.anerr_delegate && <span>Delegado: {channel.anerr_delegate}</span>}
+          {channel.anerr_territory && <span>Territorio: {channel.anerr_territory}</span>}
+          {channel.anerr_presented_on && <span>Presentación: {channel.anerr_presented_on}</span>}
+        </div>
+      )}
       <div className="bg-white border border-surface-3 rounded-xl p-3.5 mb-3">
         {editMode ? (
           <div>
@@ -507,6 +526,31 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 <input type="text" value={editForm.name} onChange={(e) => updateField('name', e.target.value)}
                   className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm focus:outline-none focus:border-brand-500" />
               </div>
+
+              <label className="grid gap-1 text-xs font-semibold">
+                Etiqueta ANERR
+                <select value={editForm.anerr_link ?? ''} onChange={event => updateField('anerr_link', event.target.value)}
+                  className="border border-surface-3 bg-white rounded-lg px-3 py-2 text-sm">
+                  <option value="">Sin etiqueta</option>
+                  <option value="ANERR">ANERR</option>
+                  <option value="ORIGEN ANERR" disabled={channel.anerr_link !== 'ORIGEN ANERR' &&
+                    (['activo', 'en_proceso_alta'].includes(channel.status) ||
+                     [channel.pipeline_stage, editForm.pipeline_stage].some(stage => ['active', 'onboarding'].includes(stage)))}>
+                    ORIGEN ANERR
+                  </option>
+                </select>
+              </label>
+              {editForm.anerr_link && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {ANERR_DETAIL_FIELDS.map(([key, label, type]) => (
+                    <label key={key} className="grid gap-1 text-xs font-semibold">
+                      {label}
+                      <input type={type} value={editForm[key] ?? ''} onChange={event => updateField(key, event.target.value)}
+                        className="border border-surface-3 bg-white rounded-lg px-3 py-2 text-sm" />
+                    </label>
+                  ))}
+                </div>
+              )}
 
               {/* Fase del pipeline — controla status automáticamente */}
               <div>

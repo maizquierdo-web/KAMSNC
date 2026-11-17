@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
+import AnerrFollowup from '../components/AnerrFollowup';
+import { useAnerrAccess } from '../lib/anerr';
 import { useChannelTypes } from '../hooks/useChannelTypes';
 import { leadOriginGroups, normalizeLeadSources } from '../lib/leadSources.mjs';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
@@ -122,6 +124,7 @@ function ChannelCard({ channel, onDragStart, stage, onClick, typeMap, showKam, d
         <ChevronRight size={11} className="text-[#c5cbd6] group-hover:text-[#E87A1E] transition-colors flex-shrink-0 mt-0.5" />
       </div>
 
+      {channel.anerr_link && <span className="mr-1 text-[10px] font-bold text-brand-600">{channel.anerr_link}</span>}
       <LeadOriginBadge sources={channel.lead_source} />
 
       {showKam && channel.profiles?.full_name && (
@@ -266,6 +269,7 @@ function PipelineMobile({ channelsByStage, onMove, loading, onChannelClick, type
                   <div key={ch.id} className="flex items-center gap-2 p-2.5 rounded-lg bg-[#ffffff] border" style={{ borderColor: stage.border }}>
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onChannelClick(ch.id)}>
                       <div className="text-sm font-semibold truncate hover:text-[#E87A1E] transition-colors">{ch.name}</div>
+                      {ch.anerr_link && <span className="mr-1 text-[10px] font-bold text-brand-600">{ch.anerr_link}</span>}
                       <LeadOriginBadge sources={ch.lead_source} />
                       <div className="text-[10px] text-[#8b90a0]">
                         {showKam && ch.profiles?.full_name ? `${ch.profiles.full_name} · ` : ''}
@@ -366,8 +370,10 @@ function KamSelector({ kams, selected, onChange }) {
 // ============ MAIN PAGE ============
 export default function PipelinePage() {
   const { user, profile, isManager } = useAuthContext();
+  const canUseAnerr = useAnerrAccess(user?.id);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [anerrOpen, setAnerrOpen] = useState(() => searchParams.get('anerr') === '1');
   const { typeMap } = useChannelTypes();
   const [channels, setChannels] = useState([]);
   const [activityChannelIds, setActivityChannelIds] = useState(new Set());
@@ -399,6 +405,7 @@ export default function PipelinePage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
+    if (anerrOpen) params.set('anerr', '1');
     if (selectedKam !== 'all') params.set('kam', selectedKam);
     if (leadOrigin !== 'all') params.set('origin', leadOrigin);
     if (period !== 'all') params.set('period', period);
@@ -406,7 +413,7 @@ export default function PipelinePage() {
     if (period === 'custom' && customFrom) params.set('from', customFrom);
     if (period === 'custom' && customTo) params.set('to', customTo);
     setSearchParams(params, { replace: true });
-  }, [selectedKam, leadOrigin, period, dateType, customFrom, customTo, setSearchParams]);
+  }, [selectedKam, leadOrigin, period, dateType, customFrom, customTo, anerrOpen, setSearchParams]);
 
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
   useEffect(() => {
@@ -628,6 +635,7 @@ export default function PipelinePage() {
 
   function handleChannelClick(channelId) {
     const pipelineParams = new URLSearchParams();
+    if (canUseAnerr && anerrOpen) pipelineParams.set('anerr', '1');
     if (selectedKam !== 'all') pipelineParams.set('kam', selectedKam);
     if (leadOrigin !== 'all') pipelineParams.set('origin', leadOrigin);
     if (period !== 'all') pipelineParams.set('period', period);
@@ -698,11 +706,24 @@ export default function PipelinePage() {
     return `${r.start.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${r.end.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
   })();
 
+  if (canUseAnerr && anerrOpen) return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h1 className="text-xl font-extrabold">Seguimiento ANERR</h1>
+        <button type="button" className="border rounded-lg px-3 py-2 text-xs font-bold" onClick={() => setAnerrOpen(false)}>Volver al pipeline</button>
+      </div>
+      <AnerrFollowup onChannelClick={handleChannelClick} />
+    </div>
+  );
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight">Pipeline</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-extrabold tracking-tight">Pipeline</h1>
+            {canUseAnerr && <button type="button" className="border rounded-lg px-3 py-1 text-xs font-bold" onClick={() => setAnerrOpen(true)}>ANERR</button>}
+          </div>
           <p className="text-xs text-[#5a6078]">
             {filteredChannels.length} canales · {totalInPipeline} en proceso
             {period !== 'all' && ` · ${periodLabel}`}

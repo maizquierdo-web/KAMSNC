@@ -34,6 +34,7 @@ const CHANNEL_FIELDS = [
 ];
 
 const ANERR_FIELDS = [
+  { key: 'anerr_link', label: 'Etiqueta ANERR' },
   { key: 'anerr_delegate', label: 'Delegado ANERR' },
   { key: 'anerr_territory', label: 'Territorio' },
   { key: 'anerr_alias', label: 'Alias' },
@@ -247,7 +248,7 @@ function FileUploadStep({ onFileParsed, anerr }) {
       <div className="mt-5 bg-surface-1 border border-surface-3 rounded-xl p-4">
         <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Cómo preparar tu Excel</h3>
         <div className="text-xs text-text-muted space-y-1.5">
-          {anerr && <p>Indica la fecha de presentación solo cuando el delegado haya confirmado el interés y la presentación dé lugar a gestión comercial. Las fichas nuevas entran en fase Lead.</p>}
+          {anerr && <p>En Etiqueta ANERR puedes indicar ANERR para un lead nuevo u ORIGEN ANERR para una ficha existente. Si dejas la etiqueta en blanco, se deduce al cotejar. Indica la fecha de presentación cuando la cuenta existente vaya a gestionarse en el acuerdo.</p>}
           <p>1. Descarga la <strong>plantilla Excel</strong> con el botón de arriba (incluye una hoja de ayuda con los valores válidos)</p>
           <p>2. Rellena los datos de tus canales (uno por fila)</p>
           <p>3. La columna <strong>Nombre</strong> es obligatoria, el resto son opcionales</p>
@@ -454,7 +455,9 @@ function PreviewStep({ rows, mapping, onImport, onBack, importing, result }) {
                 updated: 'Vínculo actualizado', excluded: 'Excluido por estar en alta o activo',
                 awaiting: 'Cuenta existente pendiente de presentación',
                 ambiguous: 'Varias coincidencias, revisar CIF y nombre',
-                invalid: 'Revisar nombre o fecha de presentación', error: 'Error al guardar',
+                invalid: 'Revisar nombre, etiqueta o fecha de presentación',
+                mismatch: 'La etiqueta indicada no corresponde a la coincidencia en CRM',
+                error: 'Error al guardar',
               }[outcome] || 'Revisar resultado'}</li>
             ))}
           </ul>
@@ -597,13 +600,13 @@ export default function ImportPage() {
           let outcome = 'invalid';
           if (!row.anerr_presented_on || date) {
             const { data, error } = await supabase.rpc('anerr_import', { payload: {
-              ...record, anerr_presented_on: date, anerr_delegate: row.anerr_delegate,
+              ...record, anerr_link: row.anerr_link, anerr_presented_on: date, anerr_delegate: row.anerr_delegate,
               anerr_territory: row.anerr_territory, anerr_alias: row.anerr_alias,
             } });
             outcome = error ? 'error' : data;
           }
           if (['created', 'linked', 'updated'].includes(outcome)) success++;
-          else if (['error', 'invalid', 'ambiguous'].includes(outcome)) errors++;
+          else if (['error', 'invalid', 'ambiguous', 'mismatch'].includes(outcome)) errors++;
           outcomes.push({ name: record.name, outcome });
         }
         continue;

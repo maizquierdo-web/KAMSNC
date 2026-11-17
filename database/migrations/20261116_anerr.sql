@@ -7,6 +7,25 @@ ALTER TABLE public.channels
   ADD COLUMN IF NOT EXISTS anerr_presented_on date,
   ADD COLUMN IF NOT EXISTS anerr_alias text;
 
+CREATE OR REPLACE FUNCTION public.anerr_check_origin_link()
+RETURNS trigger LANGUAGE plpgsql SET search_path = ''
+AS $$
+BEGIN
+  IF NEW.anerr_link = 'ORIGEN ANERR' AND OLD.anerr_link IS DISTINCT FROM NEW.anerr_link
+    AND (OLD.status IN ('activo', 'en_proceso_alta') OR NEW.status IN ('activo', 'en_proceso_alta')
+      OR OLD.pipeline_stage IN ('active', 'onboarding') OR NEW.pipeline_stage IN ('active', 'onboarding'))
+  THEN
+    RAISE EXCEPTION 'ORIGEN ANERR solo se puede asignar antes de iniciar el alta del canal';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS anerr_check_origin_link ON public.channels;
+CREATE TRIGGER anerr_check_origin_link
+BEFORE UPDATE OF anerr_link ON public.channels
+FOR EACH ROW EXECUTE FUNCTION public.anerr_check_origin_link();
+
 CREATE TABLE IF NOT EXISTS public.anerr_access (
   user_id uuid PRIMARY KEY REFERENCES public.profiles (id) ON DELETE CASCADE
 );
@@ -48,6 +67,8 @@ BEGIN
     RAISE EXCEPTION 'Acceso ANERR denegado' USING ERRCODE = '42501';
   END IF;
   incoming := jsonb_populate_record(NULL::public.channels, payload);
+  incoming.anerr_link := nullif(upper(btrim(incoming.anerr_link)), '');
+  IF incoming.anerr_link NOT IN ('ANERR', 'ORIGEN ANERR') THEN RETURN 'invalid'; END IF;
   tax_id := public.anerr_normalize(incoming.cif);
   names := array_remove(ARRAY[public.anerr_normalize(incoming.name), public.anerr_normalize(incoming.anerr_alias)], '');
   IF cardinality(names) = 0 OR (incoming.anerr_presented_on IS NOT NULL AND incoming.anerr_presented_on > current_date) THEN
@@ -75,7 +96,10 @@ BEGIN
       IF matched.status IN ('activo', 'en_proceso_alta') OR matched.pipeline_stage IN ('active', 'onboarding') THEN
         RETURN 'excluded';
       END IF;
+      IF incoming.anerr_link = 'ANERR' THEN RETURN 'mismatch'; END IF;
       IF incoming.anerr_presented_on IS NULL THEN RETURN 'awaiting'; END IF;
+    ELSIF incoming.anerr_link IS NOT NULL AND incoming.anerr_link <> matched.anerr_link THEN
+      RETURN 'mismatch';
     END IF;
     UPDATE public.channels
     SET anerr_link = coalesce(matched.anerr_link, 'ORIGEN ANERR'),
@@ -86,6 +110,8 @@ BEGIN
     WHERE id = matched.id;
     RETURN CASE WHEN matched.anerr_link IS NULL THEN 'linked' ELSE 'updated' END;
   END IF;
+
+  IF incoming.anerr_link = 'ORIGEN ANERR' THEN RETURN 'mismatch'; END IF;
 
   INSERT INTO public.channels (
     name, contact_name, phone, email, cif, website, google_rating, lead_source, potencial_caes,

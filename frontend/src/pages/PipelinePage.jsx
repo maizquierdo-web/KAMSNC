@@ -1,3 +1,4 @@
+import { pipelineRequirementsMessage } from '../lib/pipelineRequirements.mjs';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -477,7 +478,7 @@ export default function PipelinePage() {
   loadActivityIds().catch(console.error);
   return () => { cancelled = true; };
 }, [user, period, dateType, customFrom, customTo, selectedKam, isManager]);
-  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); } }, [toast]);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), toast.duration || 2500); return () => clearTimeout(t); } }, [toast]);
 
   useEffect(() => {
    if (dateType === 'activity_change' && period !== 'all' && !loadingActivities) {
@@ -580,6 +581,13 @@ export default function PipelinePage() {
     const channel = channels.find(c => c.id === channelId);
     if (!channel || channel.status === newStatusKey) return;
 
+    const requirements = pipelineRequirementsMessage(channel);
+    if (requirements) {
+      setDraggingId(null);
+      setToast({ message: requirements, color: '#ef4444', duration: 8500 });
+      return;
+    }
+
     const isCaes = isCaesChannel(channel);
     if (newStatusKey === 'en_proceso_alta' && !transitionData) {
       setPendingTransition({ channelId, statusKey: newStatusKey, kind: 'onboarding', isCaes });
@@ -624,7 +632,7 @@ export default function PipelinePage() {
       setToast({ message: `${channel.name}: ${oldStatusObj?.label} → ${newStatusObj?.label}`, color: newStatusObj?.color });
     } catch (err) {
       setChannels(oldChannels);
-      setToast({ message: 'Error al mover canal', color: '#ef4444' });
+      setToast({ message: err?.message?.startsWith('Para cambiar de fase, debes ') ? err.message : 'Error al mover canal', color: '#ef4444', duration: 8500 });
     }
     setDraggingId(null);
   }

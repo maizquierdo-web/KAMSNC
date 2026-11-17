@@ -1,3 +1,4 @@
+import { pipelineRequirementsMessage } from '../lib/pipelineRequirements.mjs';
 import { useAnerrAccess } from '../lib/anerr';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -432,6 +433,12 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       setEditError('El nombre es obligatorio');
       return;
     }
+    const statusChanged = editForm.status !== (STATUS_CONFIG[channel.status] ? channel.status : stageToStatus(channel.pipeline_stage));
+    const requirements = statusChanged ? pipelineRequirementsMessage(channel) : '';
+    if (requirements) {
+      setEditError(requirements);
+      return;
+    }
     if (editClassifications.length === 0) {
       setClassificationError('Selecciona al menos una clasificación');
       return;
@@ -441,7 +448,6 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
     setClassificationError('');
     try {
       const now = new Date().toISOString();
-      const statusChanged = editForm.status !== (STATUS_CONFIG[channel.status] ? channel.status : stageToStatus(channel.pipeline_stage));
       const nextStage = statusChanged ? STATUS_TO_DEFAULT_STAGE[editForm.status] : channel.pipeline_stage;
       const stageChanged = nextStage !== channel.pipeline_stage;
       const { error } = await supabase

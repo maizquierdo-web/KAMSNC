@@ -23,7 +23,7 @@ import AddressFields from '../components/AddressFields';
 import { useChannelTypes } from '../hooks/useChannelTypes';
 import { validatePhone, validateEmail, validateCIF } from '../lib/validators';
 import {
-  STATUS_CONFIG, PIPELINE_CONFIG,
+  STATUS_CONFIG, STATUS_LIST, STATUS_TO_DEFAULT_STAGE, PIPELINE_CONFIG,
   CREATABLE_PIPELINE_STAGES,
   POTENCIAL_OPTIONS, COMUNIDADES_AUTONOMAS,
   LEAD_SOURCE_OPTIONS, stageToStatus,
@@ -334,7 +334,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
       comunidad_autonoma: ch?.comunidad_autonoma || '',
       potencial_caes: ch?.potencial_caes || '',
       potencial_energia: ch?.potencial_energia || '',
-      pipeline_stage: ch?.pipeline_stage || 'lead',
+      status: STATUS_CONFIG[ch?.status] ? ch.status : stageToStatus(ch?.pipeline_stage),
       notes: ch?.notes || '',
       rejection_reason: ch?.rejection_reason || '',
       anerr_link: ch?.anerr_link || '',
@@ -441,7 +441,9 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
     setClassificationError('');
     try {
       const now = new Date().toISOString();
-      const stageChanged = editForm.pipeline_stage !== channel.pipeline_stage;
+      const statusChanged = editForm.status !== (STATUS_CONFIG[channel.status] ? channel.status : stageToStatus(channel.pipeline_stage));
+      const nextStage = statusChanged ? STATUS_TO_DEFAULT_STAGE[editForm.status] : channel.pipeline_stage;
+      const stageChanged = nextStage !== channel.pipeline_stage;
       const { error } = await supabase
         .from('channels')
         .update({
@@ -462,24 +464,23 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
           comunidad_autonoma: editForm.comunidad_autonoma || null,
           potencial_caes: editForm.potencial_caes || null,
           potencial_energia: editForm.potencial_energia || null,
-          pipeline_stage: editForm.pipeline_stage,
-          status: stageToStatus(editForm.pipeline_stage),
+          ...(statusChanged ? { pipeline_stage: nextStage, status: editForm.status } : {}),
           ...(stageChanged ? { pipeline_stage_changed_at: now } : {}),
           ...(canUseAnerr && editForm.anerr_link !== (channel.anerr_link || '') ? { anerr_link: editForm.anerr_link || null } : {}),
           ...(canUseAnerr && editForm.anerr_link ? Object.fromEntries(ANERR_DETAIL_FIELDS.filter(([key]) => editForm[key] !== (channel[key] || '')).map(([key]) => [key, editForm[key]?.trim() || null])) : {}),
           notes: editForm.notes || null,
-          rejection_reason: editForm.pipeline_stage === 'closed_no_deal' ? (editForm.rejection_reason || null) : null,
+          rejection_reason: ['rechazado', 'cierre_sin_acuerdo'].includes(editForm.status) ? (editForm.rejection_reason || null) : null,
         })
         .eq('id', channelId);
       if (error) throw error;
 
       if (stageChanged) {
         await supabase.from('channel_pipeline_history').insert({
-          channel_id: channelId, from_stage: channel.pipeline_stage, to_stage: editForm.pipeline_stage, changed_by: user.id,
+          channel_id: channelId, from_stage: channel.pipeline_stage, to_stage: nextStage, changed_by: user.id,
         }).catch(() => {});
       }
 
-      setChannel(prev => ({ ...prev, ...editForm, name: editForm.name.trim(), status: stageToStatus(editForm.pipeline_stage) }));
+      setChannel(prev => ({ ...prev, ...editForm, name: editForm.name.trim(), status: statusChanged ? editForm.status : prev.status, pipeline_stage: nextStage }));
       try {
         await saveClassifications();
       } catch (err) {
@@ -514,7 +515,6 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
   }
 
   const status = STATUS_CONFIG[channel.status] || STATUS_CONFIG.pendiente_contacto;
-  const pipeline = PIPELINE_CONFIG[channel.pipeline_stage] || '-';
   const isCaesChannel = classifications.some(classification =>
     classification.channel_classification?.canal?.trim().toLowerCase().includes('cae')
   ) || channel.channel_type?.trim().toLowerCase().includes('cae')
@@ -561,7 +561,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   <option value="ANERR">ANERR</option>
                   <option value="ORIGEN ANERR" disabled={channel.anerr_link !== 'ORIGEN ANERR' &&
                     (['activo', 'en_proceso_alta'].includes(channel.status) ||
-                     [channel.pipeline_stage, editForm.pipeline_stage].some(stage => ['active', 'onboarding'].includes(stage)))}>
+                     ['active', 'onboarding'].includes(channel.pipeline_stage) || ['activo', 'en_proceso_alta'].includes(editForm.status))}>
                     ORIGEN ANERR
                   </option>
                 </select>
@@ -578,18 +578,14 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                 </div>
               )}
 
-              {/* Fase del pipeline — controla status automáticamente */}
               <div>
                 <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Fase del Pipeline</label>
-                <select value={editForm.pipeline_stage} onChange={(e) => updateField('pipeline_stage', e.target.value)}
+                <select value={editForm.status} onChange={(e) => updateField('status', e.target.value)}
                   className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm focus:outline-none focus:border-brand-500">
-                  {Object.entries(PIPELINE_CONFIG).map(([key, label]) => (
+                  {STATUS_LIST.map(({ key, label }) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
                 </select>
-                <p className="text-[10px] text-text-muted mt-1">
-                  Estado derivado: <span className="font-semibold">{STATUS_CONFIG[stageToStatus(editForm.pipeline_stage)]?.label}</span>
-                </p>
               </div>
 
               <ClassificationSelector
@@ -688,7 +684,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   rows={2} className="w-full px-3 py-2.5 bg-white border border-surface-3 rounded-xl text-sm resize-none focus:outline-none focus:border-brand-500" />
               </div>
 
-              {['closed_no_deal'].includes(editForm.pipeline_stage) && (
+              {['rechazado', 'cierre_sin_acuerdo'].includes(editForm.status) && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                   <label className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Motivo de descarte</label>
                   <textarea value={editForm.rejection_reason} onChange={(e) => updateField('rejection_reason', e.target.value)}
@@ -729,11 +725,6 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${status.bg} ${status.text}`}>
                     {status.label}
                   </span>
-                  {status.label !== pipeline && (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-brand-500/20 text-brand-300">
-                      {pipeline}
-                    </span>
-                  )}
                   {canUseAnerr && (
                     <button type="button" aria-expanded={anerrEditing}
                       className="rounded-full border border-navy-100 bg-navy-50 px-2.5 py-1 text-xs font-bold text-navy-700 hover:bg-navy-100"

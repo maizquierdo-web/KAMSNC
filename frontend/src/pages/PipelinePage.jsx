@@ -8,22 +8,12 @@ import { useChannelTypes } from '../hooks/useChannelTypes';
 import { leadOriginGroups, normalizeLeadSources } from '../lib/leadSources.mjs';
 import { formatVolume, getVolumeConfig, VOLUME_UNITS } from '../components/VolumeEditor';
 import {
-  PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, stageToStatus, LEAD_SOURCE_OPTIONS,
+  PIPELINE_CONFIG, REJECTION_REASON_OPTIONS, STATUS_CONFIG, STATUS_LIST, STATUS_TO_DEFAULT_STAGE, LEAD_SOURCE_OPTIONS,
 } from '../lib/crmConstants';
 import {
   Loader2, ChevronRight, ChevronDown, X, Check, Filter,
   Calendar, Users, TrendingUp, Clock, Building2
 } from 'lucide-react';
-
-const STATUS_TO_DEFAULT_STAGE = {
-  pendiente_contacto: 'lead',
-  en_desarrollo:       'first_contact',
-  en_evaluacion:        'first_contact',
-  en_proceso_alta:     'onboarding',
-  activo:              'active',
-  rechazado:           'closed_no_deal',
-  cierre_sin_acuerdo:  'closed_no_deal',
-};
 
 function daysSince(dateStr) {
   if (!dateStr) return null;

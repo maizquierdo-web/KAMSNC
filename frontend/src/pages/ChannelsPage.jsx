@@ -256,7 +256,7 @@ function ChannelList({ channels, loading, onSelect, filter, setFilter, search, s
 }
 
 // ============ DETALLE DE CANAL ============
-function ChannelDetail({ channelId, onBack, types, typeMap }) {
+function ChannelDetail({ channelId, onBack, backLabel, types, typeMap }) {
   const { user } = useAuthContext();
   const canUseAnerr = useAnerrAccess(user?.id);
   const [anerrEditing, setAnerrEditing] = useState(false);
@@ -530,7 +530,7 @@ function ChannelDetail({ channelId, onBack, types, typeMap }) {
     <div className={`grid items-start gap-4 ${copilotOpen || hunterOpen ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : 'grid-cols-1'}`}>
       <div className="min-w-0">
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-brand-400 font-semibold mb-4">
-        ← Canales
+        ← {backLabel}
       </button>
 
       {canUseAnerr && channel.anerr_link && (
@@ -1279,7 +1279,7 @@ export default function ChannelsPage() {
     if (detailId) {
       setSelectedId(detailId);
       setView('detail');
-      if (requestedReturn?.startsWith('/pipeline')) setReturnTo(requestedReturn);
+      if (requestedReturn === '/calendar' || requestedReturn?.split('?')[0] === '/pipeline') setReturnTo(requestedReturn);
     }
   }, []);
 
@@ -1351,7 +1351,7 @@ export default function ChannelsPage() {
   }
   function handleSaved(newId) { loadChannels(); setSelectedId(newId); setView('detail'); }
 
-  if (view === 'detail' && selectedId) return <ChannelDetail channelId={selectedId} onBack={handleBack} types={types} typeMap={typeMap} />;
+  if (view === 'detail' && selectedId) return <ChannelDetail channelId={selectedId} onBack={handleBack} backLabel={returnTo === '/calendar' ? 'Agenda' : 'Canales'} types={types} typeMap={typeMap} />;
   if (view === 'new') return <NewChannelForm onBack={handleBack} onSaved={handleSaved} types={types} />;
   return (
     <>

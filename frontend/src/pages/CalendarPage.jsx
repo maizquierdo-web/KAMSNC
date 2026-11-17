@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthContext } from '../components/AuthProvider';
@@ -399,7 +400,13 @@ function EventCard({ event, onDelete, onComplete, onReschedule, canModify, canCo
       </div>
       <div className="flex-1 min-w-0">
         <div className={`text-sm font-semibold truncate ${isCompleted ? 'text-text-primary' : ''}`}>
-          {event._channelName || 'Canal'}
+          {event._channelId ? (
+            <Link to={`/channels?${new URLSearchParams({ detail: event._channelId, returnTo: '/calendar' })}`}
+              className="inline-block max-w-full truncate align-bottom text-navy-700 underline decoration-navy-200 underline-offset-2 hover:decoration-current focus-visible:outline focus-visible:outline-2"
+              aria-label={`Abrir ficha de ${event._channelName || 'canal'}`}>
+              {event._channelName || 'Abrir ficha del canal'}
+            </Link>
+          ) : (event._channelName || 'Canal')}
         </div>
         <div className="text-[10px] text-text-muted truncate">
           <span className="font-semibold" style={{ color: cfg.color }}>{cfg.label}</span>
@@ -969,11 +976,11 @@ export default function CalendarPage() {
 
     // Completed visits (not from planned)
     completedVisits.filter(v => isSameDay(new Date(v.checkin_at), day)).forEach(v => {
-      if (!events.some(e => e._source === 'planned_visit' && e._type === 'visit' && e._channelName === v.channels?.name)) {
+      if (!events.some(e => e._source === 'planned_visit' && e._type === 'visit' && e._channelId === v.channel_id)) {
         events.push({
           _type: 'visit', _source: 'completed_visit', _sourceId: v.id,
           planned_time: new Date(v.checkin_at).toTimeString().slice(0, 8),
-          is_completed: true, _channelName: v.channels?.name,
+          is_completed: true, _channelId: v.channel_id, _channelName: v.channels?.name,
           _kamName: selectedKam === 'all' ? v.profiles?.full_name : null,
         });
       }

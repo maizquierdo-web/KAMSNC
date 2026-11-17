@@ -374,6 +374,9 @@ export default function PipelinePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [anerrOpen, setAnerrOpen] = useState(() => searchParams.get('anerr') === '1');
+  const [anerrView, setAnerrView] = useState(() => searchParams.get('view') === 'seguimiento' ? 'seguimiento' : 'pipeline');
+  const [anerrLink, setAnerrLink] = useState('');
+  const anerrActive = canUseAnerr && anerrOpen;
   const { typeMap } = useChannelTypes();
   const [channels, setChannels] = useState([]);
   const [activityChannelIds, setActivityChannelIds] = useState(new Set());
@@ -405,7 +408,10 @@ export default function PipelinePage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (anerrOpen) params.set('anerr', '1');
+    if (anerrOpen) {
+      params.set('anerr', '1');
+      if (anerrView === 'seguimiento') params.set('view', anerrView);
+    }
     if (selectedKam !== 'all') params.set('kam', selectedKam);
     if (leadOrigin !== 'all') params.set('origin', leadOrigin);
     if (period !== 'all') params.set('period', period);
@@ -413,7 +419,7 @@ export default function PipelinePage() {
     if (period === 'custom' && customFrom) params.set('from', customFrom);
     if (period === 'custom' && customTo) params.set('to', customTo);
     setSearchParams(params, { replace: true });
-  }, [selectedKam, leadOrigin, period, dateType, customFrom, customTo, anerrOpen, setSearchParams]);
+  }, [selectedKam, leadOrigin, period, dateType, customFrom, customTo, anerrOpen, anerrView, setSearchParams]);
 
   useEffect(() => { if (user) { loadChannels(); if (isManager) loadTeamKams(); } }, [user]);
   useEffect(() => {
@@ -635,7 +641,10 @@ export default function PipelinePage() {
 
   function handleChannelClick(channelId) {
     const pipelineParams = new URLSearchParams();
-    if (canUseAnerr && anerrOpen) pipelineParams.set('anerr', '1');
+    if (anerrActive) {
+      pipelineParams.set('anerr', '1');
+      if (anerrView === 'seguimiento') pipelineParams.set('view', anerrView);
+    }
     if (selectedKam !== 'all') pipelineParams.set('kam', selectedKam);
     if (leadOrigin !== 'all') pipelineParams.set('origin', leadOrigin);
     if (period !== 'all') pipelineParams.set('period', period);
@@ -648,8 +657,9 @@ export default function PipelinePage() {
   }
 
   const filteredChannels = channels.filter(ch => {
+    if (anerrActive && (!ch.anerr_link || (anerrLink && ch.anerr_link !== anerrLink))) return false;
     if (selectedKam !== 'all' && ch.assigned_to !== selectedKam) return false;
-    if (leadOrigin !== 'all' && !leadOriginGroups(ch.lead_source).includes(leadOrigin)) return false;
+    if (!anerrActive && leadOrigin !== 'all' && !leadOriginGroups(ch.lead_source).includes(leadOrigin)) return false;
     if (period === 'all') return true;
     if (dateType === 'activity_change') {
   return activityChannelIds.has(ch.id);
@@ -706,23 +716,37 @@ export default function PipelinePage() {
     return `${r.start.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} — ${r.end.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
   })();
 
-  if (canUseAnerr && anerrOpen) return (
-    <div>
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h1 className="text-xl font-extrabold">Seguimiento ANERR</h1>
-        <button type="button" className="border rounded-lg px-3 py-2 text-xs font-bold" onClick={() => setAnerrOpen(false)}>Volver al pipeline</button>
+  const anerrNavigation = anerrActive && (
+    <div className="mb-4 rounded-xl border border-navy-100 bg-navy-50 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-extrabold text-navy-700">Cartera ANERR</h1>
+        <button type="button" className="text-xs font-bold text-navy-700 underline" onClick={() => setAnerrOpen(false)}>
+          Volver al pipeline general
+        </button>
       </div>
-      <AnerrFollowup onChannelClick={handleChannelClick} />
+      <div className="mt-3 flex w-fit gap-1 rounded-lg border border-navy-100 bg-white p-1" role="group" aria-label="Vista ANERR">
+        {[['pipeline', 'Pipeline'], ['seguimiento', 'Seguimiento']].map(([view, label]) => (
+          <button key={view} type="button" aria-pressed={anerrView === view} onClick={() => setAnerrView(view)}
+            className={`rounded-md px-3 py-1.5 text-xs font-bold ${anerrView === view ? 'bg-navy-700 text-white' : 'text-navy-700 hover:bg-navy-50'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
+  );
+
+  if (anerrActive && anerrView === 'seguimiento') return (
+    <div>{anerrNavigation}<AnerrFollowup onChannelClick={handleChannelClick} /></div>
   );
 
   return (
     <div>
+      {anerrNavigation}
       <div className="flex items-center justify-between mb-3">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-extrabold tracking-tight">Pipeline</h1>
-            {canUseAnerr && <button type="button" className="border rounded-lg px-3 py-1 text-xs font-bold" onClick={() => setAnerrOpen(true)}>ANERR</button>}
+            <h1 className="text-xl font-extrabold tracking-tight">{anerrActive ? 'Pipeline ANERR' : 'Pipeline'}</h1>
+            {canUseAnerr && !anerrActive && <button type="button" className="border rounded-lg px-3 py-1 text-xs font-bold" onClick={() => setAnerrOpen(true)}>ANERR</button>}
           </div>
           <p className="text-xs text-[#5a6078]">
             {filteredChannels.length} canales · {totalInPipeline} en proceso
@@ -740,6 +764,16 @@ export default function PipelinePage() {
         <KamSelector kams={teamKams} selected={selectedKam} onChange={setSelectedKam} />
       )}
 
+      {anerrActive ? (
+        <label className="mb-3 flex w-fit items-center gap-2 text-xs font-semibold">
+          Etiqueta
+          <select value={anerrLink} onChange={event => setAnerrLink(event.target.value)} className="rounded-lg border border-surface-3 bg-white px-3 py-2">
+            <option value="">Todas</option>
+            <option value="ANERR">ANERR</option>
+            <option value="ORIGEN ANERR">ORIGEN ANERR</option>
+          </select>
+        </label>
+      ) : (
       <div className="mb-3 flex items-center gap-2">
         <span className="text-xs font-semibold text-[#5a6078]">Origen</span>
         <div role="group" aria-label="Filtrar por origen del lead" className="inline-flex rounded-lg border border-[#dde1e8] bg-[#f7f8fa] p-1">
@@ -751,6 +785,8 @@ export default function PipelinePage() {
           ))}
         </div>
       </div>
+
+      )}
 
       <div className="flex gap-1.5 overflow-x-auto scrollbar-hide mb-3">
         {[

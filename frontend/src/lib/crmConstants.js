@@ -11,8 +11,8 @@
 // Si cambias un color, cámbialo aquí y se reflejará en todo el CRM.
 export const STATUS_CONFIG = {
   pendiente_contacto: { label: 'Pendiente contacto', color: '#94a3b8', bg: 'bg-slate-500/20',  text: 'text-slate-400',  border: 'border-slate-500/30',  bg_rgba: 'rgba(148,163,184,0.1)', border_rgba: 'rgba(148,163,184,0.25)' },
-  en_desarrollo:      { label: 'En desarrollo',      color: '#4f7ba7', bg: 'bg-navy-400/20',   text: 'text-navy-400',   border: 'border-navy-400/30',   bg_rgba: 'rgba(79,123,167,0.1)',  border_rgba: 'rgba(79,123,167,0.25)'  },
-  en_evaluacion:      { label: 'En evaluación',      color: '#003E6B', bg: 'bg-navy-500/20',   text: 'text-navy-500',   border: 'border-navy-500/30',   bg_rgba: 'rgba(0,62,107,0.1)',    border_rgba: 'rgba(0,62,107,0.25)'    },
+  en_desarrollo:      { label: 'Contactado',      color: '#4f7ba7', bg: 'bg-navy-400/20',   text: 'text-navy-400',   border: 'border-navy-400/30',   bg_rgba: 'rgba(79,123,167,0.1)',  border_rgba: 'rgba(79,123,167,0.25)'  },
+  en_evaluacion:      { label: 'En negociación',      color: '#003E6B', bg: 'bg-navy-500/20',   text: 'text-navy-500',   border: 'border-navy-500/30',   bg_rgba: 'rgba(0,62,107,0.1)',    border_rgba: 'rgba(0,62,107,0.25)'    },
   en_proceso_alta:    { label: 'En proceso de alta', color: '#003259', bg: 'bg-navy-600/20',   text: 'text-navy-600',   border: 'border-navy-600/30',   bg_rgba: 'rgba(0,50,89,0.1)',     border_rgba: 'rgba(0,50,89,0.25)'     },
   activo:             { label: 'Activo',             color: '#22c55e', bg: 'bg-green-500/20',  text: 'text-green-500',  border: 'border-green-500/30',  bg_rgba: 'rgba(34,197,94,0.1)',   border_rgba: 'rgba(34,197,94,0.25)'   },
   rechazado:          { label: 'Rechazado',          color: '#dc2626', bg: 'bg-red-600/20',    text: 'text-red-600',    border: 'border-red-600/30',    bg_rgba: 'rgba(220,38,38,0.1)',   border_rgba: 'rgba(220,38,38,0.25)'   },

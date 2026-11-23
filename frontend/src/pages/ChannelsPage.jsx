@@ -14,6 +14,7 @@ import ActivityTimeline from '../components/ActivityTimeline';
 import ChannelActivitySummary from '../components/ChannelActivitySummary';
 import ChannelOnboardingDetails from '../components/ChannelOnboardingDetails';
 import ChannelCaesActiveDetails from '../components/ChannelCaesActiveDetails';
+import ChannelWelcomePack from '../components/ChannelWelcomePack';
 import ChannelCopilotPanel from '../components/ChannelCopilotPanel';
 import HunterCanvasPanel from '../components/HunterCanvasPanel';
 import NextBestActionCard from '../components/NextBestActionCard';
@@ -895,7 +896,7 @@ function ChannelDetail({ channelId, onBack, backLabel, types, typeMap }) {
       <NextBestActionCard channel={channel} refreshKey={activityRefreshKey} />
 
       <div id="channel-activity" className="mb-3 scroll-mt-20">
-        <ActivityTimeline channel={channel} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
+        <ActivityTimeline channel={channel} refreshKey={activityRefreshKey} onActivityChange={() => setActivityRefreshKey(key => key + 1)} />
       </div>
 
       <div className="mb-3 [&>div]:mb-0">
@@ -907,6 +908,10 @@ function ChannelDetail({ channelId, onBack, backLabel, types, typeMap }) {
           isCaes={isCaesChannel}
           onUpdate={changes => setChannel(current => ({ ...current, ...changes }))} />
       )}
+
+      <ChannelWelcomePack channel={channel} classifications={classifications}
+        onUpdate={changes => setChannel(current => ({ ...current, ...changes }))}
+        onPrepared={() => setActivityRefreshKey(key => key + 1)} />
 
       {channel.status === 'activo' && isCaesChannel && (
         <ChannelCaesActiveDetails channel={channel}

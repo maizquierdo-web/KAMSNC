@@ -81,7 +81,7 @@ function formatFileSize(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-export default function ActivityTimeline({ channel, onActivityChange }) {
+export default function ActivityTimeline({ channel, onActivityChange, refreshKey = 0 }) {
   const { user } = useAuthContext();
   const [activities, setActivities] = useState([]);
   const [planned, setPlanned] = useState([]);
@@ -101,7 +101,7 @@ export default function ActivityTimeline({ channel, onActivityChange }) {
   });
   const [savingForm, setSavingForm] = useState(false);
 
-  useEffect(() => { if (channel?.id) loadAll(); }, [channel?.id]);
+  useEffect(() => { if (channel?.id) loadAll(); }, [channel?.id, refreshKey]);
 
   useEffect(() => {
     setNewForm(prev => ({ ...prev, contact_person: channel?.contact_name || '' }));

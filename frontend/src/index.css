@@ -30,6 +30,23 @@
 }
 
 @layer components {
+  /* El reset global appearance:none oculta las casillas nativas sin tamaño.
+     Restaurarlas solo dentro del asistente evita afectar al resto del CRM. */
+  .welcome-pack-dialog input[type="checkbox"] {
+    -webkit-appearance: checkbox;
+    appearance: auto;
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    accent-color: #e87a1e;
+    cursor: pointer;
+  }
+
+  .welcome-pack-dialog input[type="checkbox"]:focus-visible {
+    outline: 2px solid #003e6b;
+    outline-offset: 3px;
+  }
+
   .app-container {
     display: flex;
     flex-direction: column;

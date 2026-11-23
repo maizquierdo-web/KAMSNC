@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeAttachments, welcomeErrors, welcomeEmail, welcomeSendBlockers } from './welcomePack.mjs';
+import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeAttachments, welcomeErrors, welcomeEmail, welcomeSendBlockers, validEmail } from './welcomePack.mjs';
 const channel = { id: 'a', name: 'Empresa & Canal', status: 'activo', pipeline_stage: 'active', caes_platform: 'natureco', assigned_to: 'kam', contact_name: 'Ana', email: 'ana@example.com', phone: '600000001', cif: 'B00000001' };
 const kam = { full_name: 'KAM asignado', email: 'kam@example.com', phone: '600000002' };
 function complete(route='natureco') { return { ...initialWelcome(channel,kam), route, ...defaultAssignments(route,channel.name), kind: 'Agregador', startDate: '2026-12-01', sheets:['RES010','RES060'], recipientConfirmed:true }; }
@@ -38,4 +38,11 @@ test('correo enumera solo los documentos de su modalidad y firma el remitente',(
  assert.match(a,/Documento A/);assert.doesNotMatch(a,/Documento B|preoferta/);assert.match(a,/sender@example.com/);
  const b=welcomeEmail(complete('promoter_ot'),sender).body;assert.match(b,/Documento B/);assert.match(b,/Procedimiento de preoferta OCA/);
  assert.ok(welcomeSendBlockers(complete()).some(x=>x.includes('correo')));
+});
+
+test('correo con espacios copiados se normaliza y dirección incompleta se rechaza',()=>{
+ assert.equal(validEmail('  ana@example.com  '),true);
+ assert.equal(validEmail('ana@'),false);
+ const d={...complete(),recipient:' ana@example.com '};
+ assert.deepEqual(welcomeErrors(d,'sender@example.com',1),[]);
 });

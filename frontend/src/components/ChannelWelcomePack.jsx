@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2, Mail, X } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import { supabase } from '../lib/supabase';
-import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeErrors, welcomeEmail, welcomeAttachments, welcomeSendBlockers, WELCOME_ROUTES, WELCOME_SHEET_CODES, WELCOME_VERSION } from '../lib/welcomePack.mjs';
+import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeErrors, welcomeEmail, welcomeAttachments, welcomeSendBlockers, validEmail, WELCOME_ROUTES, WELCOME_SHEET_CODES, WELCOME_VERSION } from '../lib/welcomePack.mjs';
 import { createWelcomePackDocx, downloadWelcomeBlob } from '../lib/welcomePackDocx.mjs';
 const inputClass = 'w-full rounded-lg border border-surface-3 bg-white px-3 py-2 text-sm text-text-primary focus:border-navy-500 focus:outline-none';
 function Field({ label, value, onChange, type = 'text', readOnly = false }) {
@@ -127,7 +127,7 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
       <p className="mt-2 text-xs text-text-muted">Primera fase: preparación y descarga. Envío pendiente de documentos y conexión de correo.</p>
     </section>}
     {open && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3" role="presentation">
-      <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-title" className="flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl">
+      <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-title" className="welcome-pack-dialog flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl">
         <header className="flex items-center justify-between border-b border-surface-3 p-4"><h2 id="welcome-title" className="text-lg font-bold text-text-primary">Welcome pack · {channel.name}</h2><button disabled={busy} aria-label="Cerrar y conservar borrador" onClick={close}><X size={20} /></button></header>
         <div className="overflow-y-auto p-4 md:p-6">
           {loading ? <div className="flex items-center gap-2"><Loader2 className="animate-spin" />Cargando datos del CRM…</div> : data && <>
@@ -136,7 +136,16 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
             {last && <p className="mb-4 text-sm text-text-muted">Último {last.status==='prepared'?'pack preparado':'borrador'}: {new Date(last.updated_at).toLocaleString('es-ES')}. No equivale a un envío.</p>}
             {step===1 && <div className="space-y-4"><div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Remitente:</strong> {sender.name} · {sender.email || 'Correo del usuario no disponible'}<p className="mt-1 text-text-secondary">Se utilizará la cuenta autorizada del usuario del CRM. No se puede sustituir por la de otro usuario.</p></div>
               {field('contact','Persona destinataria *')}{field('recipient','Correo de destino *','email')}
-              <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={data.recipientConfirmed} onChange={e=>update('recipientConfirmed',e.target.checked)} />Confirmo este destinatario para el correo.</label>
+              <div className="rounded-lg border border-surface-3 p-3">
+                <button type="button" disabled={!data.contact.trim() || !validEmail(data.recipient)}
+                  onClick={() => { update('recipient', data.recipient.trim()); update('recipientConfirmed', true); setError(''); }}
+                  className="rounded-lg bg-navy-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+                  {data.recipientConfirmed ? 'Correo confirmado' : 'Confirmar correo de destino'}
+                </button>
+                {data.recipientConfirmed
+                  ? <p role="status" className="mt-2 text-sm font-semibold text-green-700">Destinatario confirmado: {data.recipient.trim()}</p>
+                  : <p className="mt-2 text-sm text-text-secondary">Revisa la dirección y pulsa «Confirmar correo de destino» antes de continuar.</p>}
+              </div>
               <p className="text-sm text-text-muted">Cambiar el destinatario no sustituye el email habitual del canal.</p></div>}
             {step===2 && <div className="space-y-4"><div className="grid gap-4 md:grid-cols-2">{field('company','Razón social *')}{field('cif','CIF *')}{field('phone','Teléfono del contacto *','tel')}{field('startDate','Fecha prevista de inicio *','date')}{field('kamName','KAM asignado · nombre *')}{field('kamEmail','Correo del KAM *','email')}{field('kamPhone','Teléfono del KAM *','tel')}</div>
               <details open className="rounded-lg border border-surface-3 p-3"><summary className="cursor-pointer text-sm font-bold text-navy-600">Fichas CAE que trabajará el canal * · {data.sheets.length} seleccionadas</summary><input aria-label="Buscar ficha CAE" className={`${inputClass} my-3`} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar código de ficha" />

@@ -52,7 +52,7 @@ export function welcomeAttachments(data) {
   const keys = data.route === 'mask' ? ['A'] : data.route === 'promoter_ot' ? ['B', 'OCA'] : data.route === 'natureco' ? ['B'] : [];
   return [{ key: 'welcome', name: `Welcome_Pack_${safe}.docx`, description: 'Datos del partner, configuración de arranque e interlocutores', available: true }, ...keys.map(key => ({ key, ...WELCOME_DOCUMENTS[key] }))];
 }
-export const validEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || ''));
+export const validEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 export function welcomeErrors(data, senderEmail, step = 0) {
   const errors = [];
   if (!step || step === 1) {

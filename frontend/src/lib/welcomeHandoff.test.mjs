@@ -33,3 +33,18 @@ test('ZIP de prueba contiene Word real y lista de pendientes sin documentos fict
   assert.match(await zip.file('LEEME.txt').async('string'),/PRUEBA: pack incompleto/);
  }finally{globalThis.fetch=previous;}
 });
+
+test('correo descargable contiene destinatario, texto y Word adjunto real',async()=>{
+ const { createWelcomeEmailFile }=await import('./welcomeHandoff.mjs');
+ const previous=globalThis.fetch;
+ try{
+  globalThis.fetch=async url=>new Response(await readFile(new URL('../../public'+url,import.meta.url)));
+  const file=await createWelcomeEmailFile(data,{subject:'Prueba CAE',body:'Hola, acción CAE'},{email:'kam@example.com'});
+  const mime=await file.blob.text();
+  assert.match(file.name,/\.eml$/);assert.match(mime,/To: ana@example.com/);assert.match(mime,/X-Unsent: 1/);
+  assert.match(mime,/Content-Disposition: attachment/);assert.match(mime,/BORRADOR_Welcome_Pack/);
+  const attachment=mime.split('Content-Disposition: attachment')[1].split('\r\n\r\n')[1].split('\r\n--')[0];
+  const zip=await JSZip.loadAsync(Buffer.from(attachment.replace(/\r\n/g,''),'base64'));
+  assert.ok(zip.file('word/document.xml'));
+ }finally{globalThis.fetch=previous;}
+});

@@ -3,7 +3,7 @@ export async function createWelcomePackDocx(data, { draft = true } = {}) {
   const { patchDocument, PatchType, TextRun } = await import('docx');
   const response = await fetch(`${import.meta.env?.BASE_URL || '/'}welcome-pack/${data.route === 'mask' ? 'mask' : 'natureco'}.docx`);
   if (!response.ok) throw new Error('No se ha podido cargar la plantilla de welcome pack.');
-  const contact = prefix => `${data[`${prefix}Email`] || 'Contacto pendiente de confirmar'}${data[`${prefix}Phone`] ? ` · ${data[`${prefix}Phone`]}` : ''}`;
+  const contact = prefix => [data[`${prefix}Contact`], data[`${prefix}Email`]].filter(Boolean).join(' · ') || 'Contacto pendiente de confirmar';
   const values = {
     company: data.company, cif: data.cif, contact: data.contact, contact_details: `${data.recipient} · ${data.phone}`,
     start_date: data.startDate, kam: data.kamName, kam_details: `${data.kamEmail} · ${data.kamPhone}`,

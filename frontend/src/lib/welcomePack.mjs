@@ -39,7 +39,7 @@ export function initialWelcome(channel, kam, classifications = []) {
     company: channel.name || '', cif: channel.cif || '', contact: channel.contact_name || '', recipient: channel.email || '',
     phone: channel.phone || '', kamName: kam?.full_name || '', kamEmail: kam?.email || '', kamPhone: kam?.phone || '',
     startDate: '', kind: '', route, naturecoUser: '', businessUnit: 'Retail',
-    ...assignments, ot1Email: '', ot1Phone: '', ot2Email: '', ot2Phone: '', verifierEmail: '', verifierPhone: '',
+    ...assignments, ot1Email: '', ot1Contact: '', ot2Email: '', ot2Contact: '', verifierEmail: '', verifierContact: '',
     ...saved,
     sheets: channel.caes_assigned_sheets?.length ? channel.caes_assigned_sheets : saved.sheets || [...new Set(detected)],
     // El destinatario de cada envío se confirma de nuevo, aunque haya borrador.

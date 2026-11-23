@@ -4,7 +4,7 @@ import { useAuthContext } from './AuthProvider';
 import { supabase } from '../lib/supabase';
 import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeErrors, validEmail, WELCOME_ROUTES, WELCOME_SHEET_CODES } from '../lib/welcomePack.mjs';
 import { downloadWelcomeBlob } from '../lib/welcomePackDocx.mjs';
-import { welcomeHandoffPlan, welcomeDesktopEmail, welcomeMailtoHandoff, createWelcomeDownload } from '../lib/welcomeHandoff.mjs';
+import { welcomeHandoffPlan, welcomeDesktopEmail, welcomeMailtoHandoff, createWelcomeDownload, createWelcomeEmailFile } from '../lib/welcomeHandoff.mjs';
 const inputClass = 'w-full rounded-lg border border-surface-3 bg-white px-3 py-2 text-sm text-text-primary focus:border-navy-500 focus:outline-none';
 function Field({ label, value, onChange, type = 'text', readOnly = false }) {
   return <label className="block"><span className="mb-1 block text-sm font-semibold text-text-secondary">{label}</span><input className={inputClass} type={type} value={value || ''} readOnly={readOnly} onChange={e => onChange?.(e.target.value)} /></label>;
@@ -120,6 +120,18 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
         : 'Se ha solicitado abrir tu aplicación de correo. Comprueba destinatario, cuenta remitente y adjuntos antes de enviar. El CRM no puede confirmar si se ha abierto ni si se ha enviado.');
     } catch (e) { setError(e.message || 'No se pudo abrir el correo. Puedes copiar el texto y crear el mensaje manualmente.'); }
   }
+  async function downloadEmail() {
+    setError(''); setBusy(true);
+    try {
+      const errors = welcomeErrors(data, sender.email);
+      if (errors.length) throw new Error('Completa: ' + errors.join(', '));
+      await checkActive();
+      const file = await createWelcomeEmailFile(data, email, sender);
+      downloadWelcomeBlob(file.blob, file.name);
+      setNotice('Correo .eml descargado con los documentos disponibles adjuntos. Ábrelo en Outlook; según tu versión, puede ser necesario elegir Reenviar. Comprueba remitente y destinatario antes de enviar. No se ha registrado ningún envío.');
+    } catch (e) { setError(e.message || 'No se pudo descargar el correo.'); }
+    finally { setBusy(false); }
+  }
   async function copyEmail() {
     try { await navigator.clipboard.writeText(email.body); setNotice('Texto copiado. Pégalo en el mensaje de tu aplicación de correo.'); }
     catch { setError('No se pudo copiar automáticamente. Selecciona y copia el texto del correo mostrado arriba.'); }
@@ -175,16 +187,17 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
               <label className="flex gap-2 text-sm"><input type="checkbox" checked={data.exception} onChange={e=>{const exception=e.target.checked;setData(c=>({...c,exception,...(!exception&&c.route?defaultAssignments(c.route,c.company):{})}));}} />Asignación excepcional de OT / verificadora</label>
               <div className="grid gap-4 md:grid-cols-3">{[['ot1','OT1 *'],['ot2','OT2 *'],['verifier','Verificadora *']].map(([k,l])=><Field key={k} label={l} value={data[k]} readOnly={!data.exception} onChange={v=>update(k,v)} />)}</div>
               {data.exception && field('exceptionReason','Motivo de la excepción *')}
-              <details className="rounded-lg border border-surface-3 p-3" open><summary className="cursor-pointer text-sm font-semibold">Contactos de OT y verificadora</summary><p className="my-3 text-sm text-text-muted">Puedes completarlos aquí. El directorio definitivo se incorporará cuando se facilite.</p><div className="grid gap-3 md:grid-cols-2">{field('ot1Email','Email OT1','email')}{field('ot1Phone','Teléfono OT1','tel')}{field('ot2Email','Email OT2','email')}{field('ot2Phone','Teléfono OT2','tel')}{field('verifierEmail','Email verificadora','email')}{field('verifierPhone','Teléfono verificadora','tel')}</div></details>
+              <details className="rounded-lg border border-surface-3 p-3" open><summary className="cursor-pointer text-sm font-semibold">Contactos de OT y verificadora</summary><p className="my-3 text-sm text-text-muted">Puedes completarlos aquí. El directorio definitivo se incorporará cuando se facilite.</p><div className="grid gap-3 md:grid-cols-2">{field('ot1Contact','Persona de contacto OT1')}{field('ot1Email','Correo OT1','email')}{field('ot2Contact','Persona de contacto OT2')}{field('ot2Email','Correo OT2','email')}{field('verifierContact','Persona de contacto verificadora')}{field('verifierEmail','Correo verificadora','email')}</div></details>
               {data.route && data.route!=='mask' && field('naturecoUser','Usuario de Natureco, si está confirmado')}
               <p className="text-xs text-text-muted">Nunca se solicitan contraseñas. Si regresas desde la revisión del correo y cambias la configuración, se regenerará el texto propuesto.</p></div>}
             {step===4 && <div className="space-y-4"><div className="rounded-lg bg-navy-50 p-3 text-sm"><p><strong>De:</strong> {sender.email}</p><p><strong>Para:</strong> {data.contact} · {data.recipient}</p><p><strong>Fichas:</strong> {data.sheets.join(', ')}</p></div>
               <Field label="Asunto" value={email.subject} onChange={subject=>setEmail(c=>({...c,subject}))} /><label className="block text-sm font-semibold">Texto propuesto<textarea rows={13} className={`${inputClass} mt-1`} value={email.body} onChange={e=>setEmail(c=>({...c,body:e.target.value}))} /></label>
               <h3 className="font-bold">Documentos para adjuntar manualmente</h3>{welcomeHandoffPlan(data).files.map(a=><div key={a.key} className="rounded-lg border border-surface-3 p-3 text-sm"><strong>{a.name}</strong><p>{a.description}</p></div>)}
               {welcomeHandoffPlan(data).draft && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><strong>Disponible para prueba; pack definitivo pendiente</strong><ul className="mt-2 list-disc pl-5">{welcomeHandoffPlan(data).missing.map(a=><li key={a.key}>{a.name} · pendiente de incorporar</li>)}{welcomeHandoffPlan(data).contactsMissing && <li>Contactos de OT / verificadora pendientes</li>}</ul><p className="mt-2">El correo se prepara con [PRUEBA] y enumera únicamente los archivos disponibles. Puedes poner tu propio correo como destinatario para comprobar el recorrido.</p></div>}
-              <div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Cómo enviarlo</strong><p className="mt-2">Descarga el ZIP y extrae los documentos. Abre el correo, adjunta esos archivos y comprueba el remitente antes de pulsar Enviar en Outlook. Se abrirá la aplicación de correo predeterminada de tu equipo.</p><p className="mt-2">El CRM registra «Correo preparado» y no puede comprobar el envío. Si no se abre ninguna aplicación, crea el mensaje manualmente con el destinatario, asunto y texto de este diálogo.</p></div>
+              <div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Cómo enviarlo</strong><p className="mt-2">Puedes descargar el correo .eml con los documentos disponibles ya adjuntos y abrirlo en Outlook. Si utilizas «Abrir correo», descarga el ZIP y adjunta sus archivos manualmente. Comprueba el remitente antes de enviar. Se abrirá la aplicación de correo predeterminada de tu equipo.</p><p className="mt-2">El CRM registra «Correo preparado» y no puede comprobar el envío. Si no se abre ninguna aplicación, crea el mensaje manualmente con el destinatario, asunto y texto de este diálogo.</p></div>
               <div className="flex flex-wrap gap-2">
                 <button onClick={download} disabled={busy||!active} className="flex items-center gap-2 rounded-lg border border-navy-200 px-3 py-2 text-sm font-semibold text-navy-600"><Download size={16} />Descargar documentos disponibles</button>
+                <button onClick={downloadEmail} disabled={busy||!active} className="rounded-lg bg-navy-600 px-3 py-2 text-sm font-semibold text-white">Descargar correo (.eml)</button>
                 <button onClick={copyEmail} disabled={busy} className="rounded-lg border border-navy-200 px-3 py-2 text-sm font-semibold text-navy-600">Copiar texto</button>
                 <button onClick={openDesktopMail} disabled={busy||!active} className="rounded-lg bg-navy-600 px-3 py-2 text-sm font-semibold text-white">Abrir correo (Outlook)</button>
               </div>

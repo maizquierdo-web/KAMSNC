@@ -5,8 +5,9 @@ Esta entrega implementa la preparación dentro de la ficha de canal del CRM. No 
 ## Activación
 
 1. Aplicar `database/migrations/20261123_channel_welcome_pack.sql` en el SQL Editor de Supabase. No se ha aplicado desde el desarrollo.
-2. Desplegar el frontend junto con `public/welcome-pack/mask.docx` y `natureco.docx`.
-3. En un canal con estado `activo` y fase `active`, abrir **Preparar welcome pack**.
+2. Aplicar después `database/migrations/20261123_welcome_pack_desktop_handoff.sql` para actualizar el texto del historial. No requiere permisos de Microsoft ni conexión al buzón.
+3. Desplegar el frontend junto con `public/welcome-pack/mask.docx` y `natureco.docx`.
+4. En un canal con estado `activo` y fase `active`, abrir **Preparar welcome pack**.
 
 La migración es transaccional y se puede ejecutar de nuevo. Añade dos columnas a canales, una tabla con borradores por canal/usuario y una función de guardado. Respeta las RLS de canales y notas; no amplía los permisos de acceso del CRM. El remitente se obtiene del JWT, nunca de un campo enviado por el navegador. Cada escritura comprueba ACTIVO con bloqueo de fila. El código no almacena contraseñas ni credenciales de correo.
 
@@ -23,13 +24,19 @@ La migración es transaccional y se puede ejecutar de nuevo. Añade dos columnas
 - Word: usa la plantilla de Judith, ampliada con KAM, OT1/OT2, fichas y bloque operativo. La variante máscara omite el acceso directo a Natureco. Siempre se descarga como **BORRADOR · NO ENVIAR AL CANAL** durante esta fase.
 - **Registrar preparación** crea una nota en el historial indicando **PREPARADO · NO ENVIADO**. Ni esta acción ni una descarga equivalen a enviar un correo.
 
-## Pendiente antes de habilitar envío
+## Envío desde la aplicación de correo
 
-- Documentos A, B y procedimiento de preoferta OCA validados por Negocio/Dani, con nombres y versiones definitivos.
-- Contactos validados de OT y verificadora; automatizar su directorio. Los contactos pueden completarse durante la preparación.
-- Confirmar instrucciones de acceso para los usuarios de cada modalidad.
-- Integrar la cuenta autorizada de correo del usuario (por ejemplo, un proveedor corporativo), con envío y adjuntos reales desde servidor, control de duplicados, reintentos, estado del proveedor y trazabilidad de envío.
-- Implementar la validación completa de todos los datos/adjuntos desde servidor justo antes del envío. Nunca habilitarlo quitando únicamente el atributo disabled del botón.
+Se conserva el asistente de cuatro pasos. En «Correo y adjuntos» se descarga un ZIP con el Word y únicamente los documentos operativos realmente disponibles. Extraer el ZIP, abrir el correo y adjuntar los archivos manualmente. El enlace mailto prepara destinatario, asunto y texto en la aplicación predeterminada (Outlook si está configurado). No permite elegir la cuenta remitente: el usuario debe comprobar que coincide con su correo del CRM.
+
+Si el texto supera el umbral conservador del enlace, se abre destinatario y asunto y se indica usar «Copiar texto» para pegarlo. Si no hay aplicación configurada, se puede crear el mensaje manualmente usando los datos del diálogo. No se integran Microsoft Graph, Entra ni credenciales de correo.
+
+El CRM registra **Correo preparado**, nunca «Enviado». El registro significa que se preparó el mensaje, incluso si el cliente no llega a abrirse. No confirma entrega ni apertura.
+
+## Prueba y documentación pendiente
+
+Faltan los documentos A, B y procedimiento de preoferta OCA, además del directorio validado de contactos OT/verificadora. Mientras falten, el ZIP contiene un Word marcado BORRADOR y un LEEME con pendientes; el asunto lleva [PRUEBA]. El texto enumera solo los archivos disponibles. Para probar, confirmar como destinatario una dirección propia. No utilizar este borrador como pack operativo definitivo.
+
+Al incorporar los documentos definitivos, actualizar su manifiesto en welcomePack.mjs con disponibilidad y URL reales. Completar los contactos en el diálogo. La generación descargará todos los archivos de esa modalidad; si alguno falla, se muestra error y no se descarga un pack parcial.
 
 ## Comprobación manual con Supabase
 

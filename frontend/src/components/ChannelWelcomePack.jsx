@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2, Mail, X } from 'lucide-react';
 import { useAuthContext } from './AuthProvider';
 import { supabase } from '../lib/supabase';
-import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeErrors, welcomeEmail, welcomeAttachments, welcomeSendBlockers, validEmail, WELCOME_ROUTES, WELCOME_SHEET_CODES, WELCOME_VERSION } from '../lib/welcomePack.mjs';
-import { createWelcomePackDocx, downloadWelcomeBlob } from '../lib/welcomePackDocx.mjs';
+import { canPrepareWelcome, defaultAssignments, initialWelcome, welcomeErrors, validEmail, WELCOME_ROUTES, WELCOME_SHEET_CODES } from '../lib/welcomePack.mjs';
+import { downloadWelcomeBlob } from '../lib/welcomePackDocx.mjs';
+import { welcomeHandoffPlan, welcomeDesktopEmail, welcomeMailtoHandoff, createWelcomeDownload } from '../lib/welcomeHandoff.mjs';
 const inputClass = 'w-full rounded-lg border border-surface-3 bg-white px-3 py-2 text-sm text-text-primary focus:border-navy-500 focus:outline-none';
 function Field({ label, value, onChange, type = 'text', readOnly = false }) {
   return <label className="block"><span className="mb-1 block text-sm font-semibold text-text-secondary">{label}</span><input className={inputClass} type={type} value={value || ''} readOnly={readOnly} onChange={e => onChange?.(e.target.value)} /></label>;
@@ -49,7 +50,7 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
   }
   async function start() {
     setOpen(true); setError(''); setNotice(''); setSearch('');
-    if (localDraft.current) { setData({ ...localDraft.current.data, recipientConfirmed: false }); setEmail(localDraft.current.email); setStep(1); return; }
+    if (localDraft.current) { setData({ ...localDraft.current.data, recipientConfirmed: false }); setEmail(localDraft.current.email); setStep(1); return false; }
     setLoading(true);
     try {
       const [kamResult, draftResult] = await Promise.all([
@@ -75,12 +76,12 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
     setError(''); setNotice('');
     if (prepared) {
       const errors = welcomeErrors(data, sender.email);
-      if (errors.length) { setError('Completa: ' + errors.join(', ')); setStep(1); return; }
-      if (!email.subject.trim() || !email.body.trim()) { setError('Completa el asunto y el texto del correo.'); return; }
+      if (errors.length) { setError('Completa: ' + errors.join(', ')); setStep(1); return false; }
+      if (!email.subject.trim() || !email.body.trim()) { setError('Completa el asunto y el texto del correo.'); return false; }
     }
     setBusy(true);
     try {
-      const cleanData = { ...data }; delete cleanData.recipientConfirmed;
+      const cleanData = { ...data, deliveryMethod: 'desktop' }; delete cleanData.recipientConfirmed;
       const { data: saved, error: saveError } = await supabase.rpc('save_channel_welcome_pack', {
         p_channel_id: channel.id, p_data: cleanData, p_email: email,
         p_save_channel: saveChannel, p_prepared: prepared,
@@ -91,8 +92,9 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
         ...Object.fromEntries(Object.entries({ name: data.company, cif: data.cif, contact_name: data.contact, phone: data.phone }).filter(([, value]) => value?.trim())),
         caes_assigned_sheets: data.sheets, welcome_pack_config: cleanData });
       if (prepared) onPrepared?.();
-      setNotice(prepared ? 'Preparación registrada en el historial. No se ha enviado ningún correo.' : 'Borrador guardado en el CRM.');
-    } catch (e) { setError(`No se pudo guardar. Tus datos siguen en este diálogo. ${e.message || ''}`); }
+      setNotice(prepared ? 'Correo preparado y registrado. El envío se realiza desde tu aplicación de correo.' : 'Borrador guardado en el CRM.');
+      return true;
+    } catch (e) { setError(`No se pudo guardar. Tus datos siguen en este diálogo. ${e.message || ''}`); return false; }
     finally { setBusy(false); }
   }
   async function download() {
@@ -101,17 +103,32 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
       const errors = welcomeErrors(data, sender.email);
       if (errors.length) throw new Error('Completa antes de generar el Word: ' + errors.join(', '));
       await checkActive();
-      const blob = await createWelcomePackDocx(data, { draft: true });
-      downloadWelcomeBlob(blob, 'BORRADOR_' + welcomeAttachments(data)[0].name);
-      setNotice('Word descargado como BORRADOR. Faltan los documentos operativos y la configuración del envío.');
+      const pack = await createWelcomeDownload(data);
+      downloadWelcomeBlob(pack.blob, pack.name);
+      setNotice(pack.plan.draft ? 'ZIP de PRUEBA descargado. Contiene el Word borrador y una lista de pendientes. Extrae los archivos antes de adjuntarlos al correo.' : 'Documentos descargados en ZIP. Extrae y adjunta los archivos al correo antes de enviarlo.');
     } catch (e) { setError(e.message || 'No se pudo generar el documento.'); }
     finally { setBusy(false); }
+  }
+  async function openDesktopMail() {
+    setError('');
+    try {
+      const handoff = welcomeMailtoHandoff(email, data.recipient);
+      if (!await save(true)) return;
+      window.location.href = handoff.url;
+      setNotice(handoff.copyBody
+        ? 'Se ha solicitado abrir el correo con destinatario y asunto. El texto es largo: utiliza «Copiar texto» y pégalo en el mensaje. Adjunta los archivos descargados y comprueba el remitente.'
+        : 'Se ha solicitado abrir tu aplicación de correo. Comprueba destinatario, cuenta remitente y adjuntos antes de enviar. El CRM no puede confirmar si se ha abierto ni si se ha enviado.');
+    } catch (e) { setError(e.message || 'No se pudo abrir el correo. Puedes copiar el texto y crear el mensaje manualmente.'); }
+  }
+  async function copyEmail() {
+    try { await navigator.clipboard.writeText(email.body); setNotice('Texto copiado. Pégalo en el mensaje de tu aplicación de correo.'); }
+    catch { setError('No se pudo copiar automáticamente. Selecciona y copia el texto del correo mostrado arriba.'); }
   }
   function next() {
     const errors = welcomeErrors(data, sender.email, step);
     if (errors.length) { setError('Completa aquí: ' + errors.join(', ')); return; }
     setError('');
-    if (step === 3) setEmail(welcomeEmail(data, sender));
+    if (step === 3) setEmail(welcomeDesktopEmail(data, sender));
     setStep(value => value + 1);
   }
   function selectRoute(route) {
@@ -121,10 +138,10 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
   const codes = [...new Set([...WELCOME_SHEET_CODES, ...(data?.sheets || [])])].sort();
   return <>
     {active && <section className="mb-3 rounded-xl border border-navy-100 bg-white p-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold text-text-primary">Welcome pack CAE</h3><p className="text-sm text-text-secondary">Prepara el Word y el correo con la configuración del canal.</p></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold text-text-primary">Welcome pack CAE</h3><p className="text-sm text-text-secondary">Prepara el correo y descarga los documentos para adjuntarlos en Outlook.</p></div>
         <button ref={triggerRef} onClick={start} className="flex items-center gap-2 rounded-lg bg-navy-600 px-4 py-2.5 text-sm font-semibold text-white"><Mail size={16} />Preparar welcome pack</button></div>
       {hasLocalDraft && <p className="mt-2 text-sm text-text-muted">Tienes un borrador de esta sesión. Puedes retomarlo.</p>}
-      <p className="mt-2 text-xs text-text-muted">Primera fase: preparación y descarga. Envío pendiente de documentos y conexión de correo.</p>
+      <p className="mt-2 text-xs text-text-muted">El envío se realiza desde tu aplicación de correo, sin conectar el buzón al CRM.</p>
     </section>}
     {open && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3" role="presentation">
       <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="welcome-title" className="welcome-pack-dialog flex max-h-[92dvh] w-full max-w-3xl flex-col rounded-xl bg-white shadow-xl">
@@ -134,7 +151,7 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
             <ol className="mb-5 grid grid-cols-2 gap-2 text-sm md:grid-cols-4">{['Destinatario','Datos y fichas CAE','Configuración','Correo y adjuntos'].map((label,i)=><li key={label} aria-current={step===i+1?'step':undefined} className={`border-b-2 pb-2 ${step===i+1?'border-brand-500 font-bold text-navy-600':'border-surface-3 text-text-muted'}`}>{label}</li>)}</ol>
             {!active && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">El canal ya no está ACTIVO. Los datos introducidos se conservan.</p>}
             {last && <p className="mb-4 text-sm text-text-muted">Último {last.status==='prepared'?'pack preparado':'borrador'}: {new Date(last.updated_at).toLocaleString('es-ES')}. No equivale a un envío.</p>}
-            {step===1 && <div className="space-y-4"><div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Remitente:</strong> {sender.name} · {sender.email || 'Correo del usuario no disponible'}<p className="mt-1 text-text-secondary">Se utilizará la cuenta autorizada del usuario del CRM. No se puede sustituir por la de otro usuario.</p></div>
+            {step===1 && <div className="space-y-4"><div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Remitente:</strong> {sender.name} · {sender.email || 'Correo del usuario no disponible'}<p className="mt-1 text-text-secondary">Remitente previsto: el usuario del CRM. Al abrir Outlook, comprueba que está seleccionada esta cuenta; el CRM no puede elegirla por ti.</p></div>
               {field('contact','Persona destinataria *')}{field('recipient','Correo de destino *','email')}
               <div className="rounded-lg border border-surface-3 p-3">
                 <button type="button" disabled={!data.contact.trim() || !validEmail(data.recipient)}
@@ -163,10 +180,14 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
               <p className="text-xs text-text-muted">Nunca se solicitan contraseñas. Si regresas desde la revisión del correo y cambias la configuración, se regenerará el texto propuesto.</p></div>}
             {step===4 && <div className="space-y-4"><div className="rounded-lg bg-navy-50 p-3 text-sm"><p><strong>De:</strong> {sender.email}</p><p><strong>Para:</strong> {data.contact} · {data.recipient}</p><p><strong>Fichas:</strong> {data.sheets.join(', ')}</p></div>
               <Field label="Asunto" value={email.subject} onChange={subject=>setEmail(c=>({...c,subject}))} /><label className="block text-sm font-semibold">Texto propuesto<textarea rows={13} className={`${inputClass} mt-1`} value={email.body} onChange={e=>setEmail(c=>({...c,body:e.target.value}))} /></label>
-              <h3 className="font-bold">Adjuntos previstos</h3>{welcomeAttachments(data).map(a=><div key={a.key} className="rounded-lg border border-surface-3 p-3 text-sm"><strong>{a.name}</strong><p>{a.description}</p><p className={a.available?'text-navy-600':'text-amber-700'}>{a.available?'Word personalizado · disponible como borrador':'Pendiente de incorporar el documento validado'}</p></div>)}
-              <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><strong>Envío real bloqueado</strong><ul className="mt-2 list-disc pl-5">{welcomeSendBlockers(data).map(x=><li key={x}>{x}</li>)}</ul><p className="mt-2">El texto es una propuesta para el envío futuro. No se adjuntan ni se envían documentos inexistentes.</p></div>
-              <button onClick={download} disabled={busy||!active} className="flex items-center gap-2 rounded-lg border border-navy-200 px-3 py-2 text-sm font-semibold text-navy-600"><Download size={16} />Descargar Word borrador</button>
-              <button disabled className="rounded-lg bg-surface-2 px-4 py-2 text-sm text-text-muted">Enviar correo · pendiente de configuración</button>
+              <h3 className="font-bold">Documentos para adjuntar manualmente</h3>{welcomeHandoffPlan(data).files.map(a=><div key={a.key} className="rounded-lg border border-surface-3 p-3 text-sm"><strong>{a.name}</strong><p>{a.description}</p></div>)}
+              {welcomeHandoffPlan(data).draft && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"><strong>Disponible para prueba; pack definitivo pendiente</strong><ul className="mt-2 list-disc pl-5">{welcomeHandoffPlan(data).missing.map(a=><li key={a.key}>{a.name} · pendiente de incorporar</li>)}{welcomeHandoffPlan(data).contactsMissing && <li>Contactos de OT / verificadora pendientes</li>}</ul><p className="mt-2">El correo se prepara con [PRUEBA] y enumera únicamente los archivos disponibles. Puedes poner tu propio correo como destinatario para comprobar el recorrido.</p></div>}
+              <div className="rounded-lg bg-navy-50 p-3 text-sm"><strong>Cómo enviarlo</strong><p className="mt-2">Descarga el ZIP y extrae los documentos. Abre el correo, adjunta esos archivos y comprueba el remitente antes de pulsar Enviar en Outlook. Se abrirá la aplicación de correo predeterminada de tu equipo.</p><p className="mt-2">El CRM registra «Correo preparado» y no puede comprobar el envío. Si no se abre ninguna aplicación, crea el mensaje manualmente con el destinatario, asunto y texto de este diálogo.</p></div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={download} disabled={busy||!active} className="flex items-center gap-2 rounded-lg border border-navy-200 px-3 py-2 text-sm font-semibold text-navy-600"><Download size={16} />Descargar documentos disponibles</button>
+                <button onClick={copyEmail} disabled={busy} className="rounded-lg border border-navy-200 px-3 py-2 text-sm font-semibold text-navy-600">Copiar texto</button>
+                <button onClick={openDesktopMail} disabled={busy||!active} className="rounded-lg bg-navy-600 px-3 py-2 text-sm font-semibold text-white">Abrir correo (Outlook)</button>
+              </div>
             </div>}
           </>}
           {error && <div role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -177,7 +198,7 @@ export default function ChannelWelcomePack({ channel, classifications, onUpdate,
           <button disabled={busy} onClick={close} className="rounded-lg px-3 py-2">Cerrar y conservar</button>
           {step>1 && <button disabled={busy} onClick={()=>{setStep(s=>s-1);setError('');}} className="rounded-lg border border-surface-3 px-3 py-2">Anterior</button>}
           <button disabled={busy||!active} onClick={()=>save(false)} className="rounded-lg border border-navy-200 px-3 py-2 text-navy-600">Guardar borrador</button>
-          {step<4 ? <button disabled={busy||!active} onClick={next} className="rounded-lg bg-brand-500 px-3 py-2 font-semibold text-white">Continuar</button> : <button disabled={busy||!active} onClick={()=>save(true)} className="rounded-lg bg-navy-600 px-3 py-2 font-semibold text-white">Registrar preparación · no enviar</button>}
+          {step<4 ? <button disabled={busy||!active} onClick={next} className="rounded-lg bg-brand-500 px-3 py-2 font-semibold text-white">Continuar</button> : <button disabled={busy||!active} onClick={()=>save(true)} className="rounded-lg bg-navy-600 px-3 py-2 font-semibold text-white">Registrar correo preparado</button>}
         </footer>}
       </section>
     </div>}

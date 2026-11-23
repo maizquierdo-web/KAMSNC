@@ -22,7 +22,8 @@
     "react-markdown": "^9.1.0",
     "react-router-dom": "^6.24.0",
     "remark-gfm": "^4.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

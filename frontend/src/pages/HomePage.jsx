@@ -1,3 +1,4 @@
+import { teamsMeetingInfo } from '../lib/teamsMeeting.mjs';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -54,6 +55,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [todayActions, setTodayActions] = useState([]);
+  const [teamsToConfirm, setTeamsToConfirm] = useState([]);
   const [completedToday, setCompletedToday] = useState(0);
   const [attentionItems, setAttentionItems] = useState([]);
   const [stats, setStats] = useState({ today: 0, withoutNext: 0, inactive: 0, overdue: 0 });
@@ -96,6 +98,14 @@ export default function HomePage() {
         channelName: channelMap.get(item.channel_id)?.name || 'Canal', channelAddress: channelMap.get(item.channel_id)?.address || '',
         type: item.activity_type || 'other', time: item.scheduled_time?.slice(0, 5) || '--:--', notes: item.notes,
       }));
+      setTeamsToConfirm(feed.filter(item => item.activity_type === 'meeting'
+        && (item.status === 'overdue' || (item.status === 'planned' && item.scheduled_date === today
+          && item.scheduled_time && item.scheduled_time.slice(0, 5) <= new Date().toTimeString().slice(0, 5)))
+        && teamsMeetingInfo(item.notes).url)
+        .map(item => ({
+          id: item.activity_key, sourceId: item.source_id, source: item.source_table, channelId: item.channel_id,
+          channelName: channelMap.get(item.channel_id)?.name || 'Canal', date: item.scheduled_date,
+        })));
       const active = channels.filter(channel => !['discarded', 'closed', 'inactive'].includes(channel.status));
       const futureIds = new Set(feed.filter(item => item.scheduled_date >= today && ['planned', 'in_progress'].includes(item.status)).map(item => item.channel_id));
       const withoutNext = active.filter(channel => !futureIds.has(channel.id));
@@ -190,8 +200,19 @@ export default function HomePage() {
       <section className="rounded-2xl border border-surface-3 bg-surface-1 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3"><div><h2 className="text-sm font-bold">Próximas acciones</h2><p className="text-[10px] text-text-muted">Pendientes de hoy, ordenadas por hora</p></div><button onClick={() => navigate('/calendar')} className="text-[10px] font-bold text-brand-500 flex items-center gap-1">Ver agenda <ArrowRight size={12} /></button></div>
         {todayActions.length === 0 ? <div className="py-10 text-center"><Check size={24} className="mx-auto mb-2 text-green-500" /><p className="text-sm font-semibold">No tienes acciones pendientes hoy</p><p className="text-[10px] text-text-muted mt-1">Puedes revisar los canales que necesitan atención.</p></div> : <div className="divide-y divide-surface-3">
-          {todayActions.slice(0, 6).map(item => { const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.other; const Icon = cfg.icon; return <div key={item.id} className="flex items-center gap-3 px-4 py-3"><div className="w-10 text-xs font-extrabold" style={{ color: cfg.color }}>{item.time}</div><div className={`w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center`}><Icon size={15} style={{ color: cfg.color }} /></div><button onClick={() => openChannel(item.channelId)} className="flex-1 min-w-0 text-left"><div className="text-xs font-bold truncate">{item.channelName}</div><div className="text-[10px] text-text-muted truncate"><span style={{ color: cfg.color }} className="font-semibold">{cfg.label}</span>{item.notes ? ` · ${item.notes}` : item.channelAddress ? ` · ${item.channelAddress}` : ''}</div></button><button onClick={() => completeAction(item)} className="px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 text-[10px] font-bold flex items-center gap-1"><Check size={11} /> Hecho</button></div>; })}
-        </div>}
+          {todayActions.slice(0, 6).map(item => { const cfg = TYPE_CONFIG[item.type] || TYPE_CONFIG.other; const Icon = cfg.icon; const meeting = item.type === 'meeting' ? teamsMeetingInfo(item.notes) : { url: '', notes: item.notes }; return <div key={item.id} className="flex items-center gap-3 px-4 py-3"><div className="w-10 text-xs font-extrabold" style={{ color: cfg.color }}>{item.time}</div><div className={`w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center`}><Icon size={15} style={{ color: cfg.color }} /></div><button onClick={() => openChannel(item.channelId)} className="flex-1 min-w-0 text-left"><div className="text-xs font-bold truncate">{item.channelName}</div><div className="text-[10px] text-text-muted truncate"><span style={{ color: cfg.color }} className="font-semibold">{cfg.label}</span>{meeting.notes ? ` · ${meeting.notes}` : item.channelAddress ? ` · ${item.channelAddress}` : ''}</div></button>{meeting.url && <a href={meeting.url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-navy-700 underline">Unirse a Teams</a>}<button onClick={() => completeAction(item)} className="px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 text-[10px] font-bold flex items-center gap-1"><Check size={11} /> {meeting.url ? 'Confirmar realizada' : 'Hecho'}</button></div>; })}
+        {teamsToConfirm.length > 0 && <section className="rounded-xl border border-surface-3 bg-surface-0 p-4">
+        <h2 className="text-sm font-bold">Reuniones de Teams por confirmar</h2>
+        <ul className="mt-2 divide-y divide-surface-3">
+          {teamsToConfirm.map(item => <li key={item.id} className="flex flex-wrap items-center gap-2 py-2 text-xs">
+            <button className="font-semibold underline" onClick={() => openChannel(item.channelId)}>{item.channelName}</button>
+            <span className="mr-auto text-text-muted">{item.date}</span>
+            <button className="rounded-lg bg-green-50 px-3 py-2 font-semibold text-green-700"
+              onClick={() => completeAction(item)}>Confirmar realizada</button>
+          </li>)}
+        </ul>
+      </section>}
+      </div>}
       </section>
       <section className="rounded-2xl border border-surface-3 bg-surface-1 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3"><div><h2 className="text-sm font-bold">Necesitan atención</h2><p className="text-[10px] text-text-muted">Prioridades detectadas automáticamente</p></div><span className="min-w-6 h-6 px-2 rounded-full bg-surface-2 text-xs font-bold flex items-center justify-center">{attentionItems.length}</span></div>

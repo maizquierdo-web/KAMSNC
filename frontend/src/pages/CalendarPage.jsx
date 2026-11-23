@@ -1,3 +1,4 @@
+import { teamsMeetingInfo, teamsMeetingUrl } from '../lib/teamsMeeting.mjs';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
@@ -99,6 +100,9 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
   const [selectedChannel, setSelectedChannel] = useState('');
   const [time, setTime] = useState('09:00');
   const [notes, setNotes] = useState('');
+  const [teamsLink, setTeamsLink] = useState('');
+  const teamsUrl = actionType === 'meeting' ? teamsMeetingUrl(teamsLink) : '';
+  const invalidTeamsLink = actionType === 'meeting' && Boolean(teamsLink.trim()) && !teamsUrl;
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -106,7 +110,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
   const fieldClass = "w-full px-3 py-2.5 bg-surface-0 border border-surface-3 rounded-xl text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-brand-500 transition-colors";
 
   async function handleSave() {
-    if (!selectedChannel) return;
+    if (!selectedChannel || invalidTeamsLink || saving) return;
     setSaving(true);
     try {
       await onSave({
@@ -114,7 +118,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
         channel_id: selectedChannel,
         planned_date: formatDateKey(date),
         planned_time: time + ':00',
-        notes: notes || null,
+        notes: [teamsUrl && `Teams: ${teamsUrl}`, notes.trim()].filter(Boolean).join('\n') || null,
       });
     } finally { setSaving(false); }
   }
@@ -175,6 +179,15 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
             <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Hora</label>
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={fieldClass} />
           </div>
+          {actionType === 'meeting' && (
+            <label className="block text-xs font-semibold">
+              Enlace de Teams (opcional)
+              <input type="url" value={teamsLink} onChange={e => setTeamsLink(e.target.value)}
+                placeholder="Pega el enlace de la convocatoria" className={fieldClass}
+                aria-invalid={invalidTeamsLink} />
+              {invalidTeamsLink && <span role="alert" className="text-red-600">Introduce un enlace válido para unirse a Teams.</span>}
+            </label>
+          )}
           <div>
             <label className="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Notas / Objetivo</label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="¿Qué quieres conseguir?" rows={2} className={`${fieldClass} resize-none`} />
@@ -182,7 +195,7 @@ function NewPlannedActionModal({ date, channels, onSave, onClose }) {
         </div>
 
         <div className="p-4 border-t border-surface-3">
-          <button onClick={handleSave} disabled={!selectedChannel || saving}
+          <button onClick={handleSave} disabled={!selectedChannel || invalidTeamsLink || saving}
             className="w-full py-3 bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Calendar size={16} />}
             Planificar {TYPE_CONFIG[actionType]?.label.toLowerCase() || 'acción'}
@@ -387,6 +400,7 @@ function EventCard({ event, onDelete, onComplete, onReschedule, canModify, canCo
   const cfg = TYPE_CONFIG[event._type] || TYPE_CONFIG.other;
   const Icon = cfg.icon;
   const isCompleted = event.is_completed;
+  const meeting = event._type === 'meeting' ? teamsMeetingInfo(event.notes) : { url: '', notes: event.notes };
 
   return (
     <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
@@ -413,7 +427,9 @@ function EventCard({ event, onDelete, onComplete, onReschedule, canModify, canCo
           {event._kamName ? ` · ${event._kamName}` : ''}
           {event._channelAddress ? ` · ${event._channelAddress}` : ''}
         </div>
-        {event.notes && <div className="text-[10px] text-text-muted mt-0.5 truncate">{event.notes}</div>}
+        {meeting.notes && <div className="text-[10px] text-text-muted mt-0.5 truncate">{meeting.notes}</div>}
+        {!isCompleted && meeting.url && <a href={meeting.url} target="_blank" rel="noopener noreferrer"
+          className="inline-block py-1 text-xs font-semibold text-navy-700 underline">Unirse a Teams</a>}
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         {isCompleted ? (

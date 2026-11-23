@@ -50,3 +50,11 @@ Al incorporar los documentos definitivos, actualizar su manifiesto en welcomePac
 - Probar con usuario ajeno al canal: las RLS deben impedir leer/actualizar borradores y la RPC no debe actualizar el canal.
 
 Las pruebas automatizadas cubren elegibilidad, datos ausentes, asignaciones, selección múltiple, correo condicional y generación de Word en las tres modalidades. Las RLS y la RPC requieren las comprobaciones anteriores sobre una base de pruebas; no se ha ejecutado SQL contra producción.
+
+## Corrección de apertura y correo descargable
+
+Aplicar `20261123_welcome_pack_search_path_fix.sql` después de las migraciones anteriores. Mantiene SECURITY INVOKER y RLS y fija el esquema public para que las funciones/políticas existentes encuentren profiles. Validar con un usuario autorizado y otro sin acceso en Supabase.
+
+Los contactos de OT1, OT2 y verificadora contienen persona y correo, sin teléfono; los teléfonos antiguos no se muestran ni se incluyen en el Word.
+
+«Descargar correo (.eml)» genera un MIME con texto UTF-8 y archivos disponibles adjuntos, sin depender del guardado del borrador. Comprueba que el canal sigue activo antes de generar. No registra envío. Outlook puede abrirlo como mensaje y requerir Reenviar, dependiendo de la versión. «Abrir correo» conserva el comportamiento mailto y requiere guardado correcto.
